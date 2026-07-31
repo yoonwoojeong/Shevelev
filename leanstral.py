@@ -1,0 +1,577 @@
+"""
+Leanstral 1.5 — Lean 4 Proof Assistant Script
+═══════════════════════════════════════════════
+
+A simple CLI tool that sends Lean 4 proof goals to Mistral's
+Leanstral 1.5 model and returns completed proofs.
+
+Usage:
+    python leanstral.py                          # interactive mode
+    python leanstral.py --goal "theorem ..."     # single goal mode
+    python leanstral.py --file MyTheorem.lean    # fill sorry's in a file
+
+Requires:
+    pip install httpx
+    Set MISTRAL_API_KEY environment variable
+"""
+
+import os
+import sys
+import json
+import argparse
+import re
+
+try:
+    import httpx
+except ImportError:
+    print("ERROR: httpx is required. Install it with:  pip install httpx")
+    sys.exit(1)
+
+# ── Configuration ─────────────────────────────────────────────────
+
+API_URL = "https://api.mistral.ai/v1/chat/completions"
+DEFAULT_MODEL = "labs-leanstral-1-5"
+MAX_TOKENS = 4096
+
+SYSTEM_PROMPT = """\
+You are an expert formal verification engineer specializing in Lean 4.
+Your goal is to construct valid, machine-checkable Lean 4 proofs.
+
+When provided with a theorem statement or a goal state:
+1. Analyze the context, imports, and available hypotheses.
+2. Produce a complete proof using idiomatic Lean 4 tactics.
+3. Ensure the proof avoids 'sorry' (incomplete proofs).
+4. Use Mathlib lemmas and tactics where applicable.
+5. Return ONLY the Lean 4 code — no markdown fences, no explanations.
+"""
+
+# Will be set by main() from CLI args
+_model = DEFAULT_MODEL
+
+
+# ── API Interaction ───────────────────────────────────────────────
+
+def get_api_key() -> str:
+    key = os.environ.get("MISTRAL_API_KEY", "")
+    if not key:
+        print("ERROR: MISTRAL_API_KEY environment variable is not set.")
+        print("Get your key at: https://console.mistral.ai/api-keys")
+        print()
+        print("Set it with:")
+        print('  $env:MISTRAL_API_KEY = "your-key-here"')
+        sys.exit(1)
+    return key
+
+
+def query_leanstral(goal: str, context: str = "", api_key: str = "") -> str:
+    """Send a proof goal to Leanstral 1.5 and return the completion."""
+
+    if not api_key:
+        api_key = get_api_key()
+
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+    ]
+
+    if context:
+        messages.append({
+            "role": "user",
+            "content": f"Here is the surrounding Lean 4 file for context:\n\n```lean\n{context}\n```",
+        })
+        messages.append({
+            "role": "assistant",
+            "content": "Understood. I will use this context when completing the proof.",
+        })
+
+    messages.append({
+        "role": "user",
+        "content": f"Complete the following Lean 4 proof. Return ONLY valid Lean 4 code.\n\n{goal}",
+    })
+
+    payload = {
+        "model": _model,
+        "messages": messages,
+        "max_tokens": MAX_TOKENS,
+        "temperature": 0.1,
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+
+    with httpx.Client(timeout=120) as client:
+        resp = client.post(API_URL, json=payload, headers=headers)
+
+    if resp.status_code != 200:
+        print(f"API Error {resp.status_code}: {resp.text}")
+        sys.exit(1)
+
+    data = resp.json()
+    return data["choices"][0]["message"]["content"].strip()
+
+
+# ── File Mode: fill sorry's ──────────────────────────────────────
+
+# Patterns that start a new top-level Lean declaration
+_DECL_PATTERN = re.compile(
+    r"^(theorem|lemma|def|noncomputable def|instance|example|@\[)",
+    re.MULTILINE
+)
+
+
+def _find_theorem_block(lines: list[str], sorry_line_idx: int) -> tuple[int, int]:
+    """Find the theorem/lemma block surrounding a sorry on `sorry_line_idx`.
+
+    Returns (start_line_idx, end_line_idx) as 0-indexed inclusive line range.
+    """
+    # Search backwards for the declaration start
+    start = sorry_line_idx
+    for i in range(sorry_line_idx, -1, -1):
+        stripped = lines[i].lstrip()
+        if _DECL_PATTERN.match(stripped):
+            start = i
+            break
+        # Also catch doc comments / attributes right before
+        if stripped.startswith("/-") or stripped.startswith("/--"):
+            start = i
+            break
+
+    # Search forwards for the next declaration (or end of file)
+    end = len(lines) - 1
+    for i in range(sorry_line_idx + 1, len(lines)):
+        stripped = lines[i].lstrip()
+        if _DECL_PATTERN.match(stripped):
+            end = i - 1
+            # Skip trailing blank lines
+            while end > sorry_line_idx and lines[end].strip() == "":
+                end -= 1
+            break
+
+    return start, end
+
+
+def _extract_context_window(lines: list[str], start: int, end: int,
+                            window: int = 30) -> str:
+    """Extract surrounding context (imports, definitions) for the LLM."""
+    # Always include the first 40 lines (imports + open statements)
+    header_end = min(40, start)
+    header = "\n".join(lines[:header_end])
+
+    # Include `window` lines before the block
+    ctx_start = max(header_end, start - window)
+    before = "\n".join(lines[ctx_start:start])
+
+    return f"{header}\n-- [...]\n{before}" if before.strip() else header
+
+
+def fill_sorries(filepath: str, api_key: str) -> str:
+    """Read a .lean file, find `sorry`s, and ask Leanstral to fill them ONE AT A TIME.
+
+    Instead of sending the entire file for rewriting (which causes truncation
+    on large files), this extracts each theorem block containing a sorry,
+    sends just that block with surrounding context, and splices the fix back in.
+    """
+    with open(filepath, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    lines = content.splitlines()
+
+    # Find all lines containing `sorry` (as a tactic, not in comments/strings)
+    sorry_lines = []
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        # Skip comment-only lines and doc comments
+        if stripped.startswith("--") or stripped.startswith("/-"):
+            continue
+        # Match `sorry` as a standalone token (not part of a word)
+        if re.search(r'\bsorry\b', stripped):
+            sorry_lines.append(i)
+
+    if not sorry_lines:
+        print(f"  ⏭  No 'sorry' found in {filepath}. Skipping.")
+        return content
+
+    print(f"  📝 Found {len(sorry_lines)} sorry(s) in {os.path.basename(filepath)}")
+    print(f"     Using per-sorry replacement mode (safe for large files)")
+    print()
+
+    # Process each sorry from LAST to FIRST so line numbers stay valid
+    for idx, sorry_line_idx in enumerate(reversed(sorry_lines), 1):
+        line_num = sorry_line_idx + 1  # 1-indexed for display
+
+        # Find the theorem block
+        block_start, block_end = _find_theorem_block(lines, sorry_line_idx)
+        block = "\n".join(lines[block_start:block_end + 1])
+
+        # Get surrounding context
+        context = _extract_context_window(lines, block_start, block_end)
+
+        print(f"  [{idx}/{len(sorry_lines)}] Line {line_num}: "
+              f"processing block (lines {block_start+1}-{block_end+1})...")
+
+        # Ask Leanstral to fill just this block
+        prompt = (
+            "The following Lean 4 theorem/lemma contains `sorry`. "
+            "Replace the `sorry` with a valid proof.\n"
+            "Return ONLY the complete theorem/lemma with the proof filled in. "
+            "Do NOT return anything else — no imports, no other theorems, "
+            "no markdown fences, no explanations.\n\n"
+            f"```lean\n{block}\n```"
+        )
+
+        try:
+            result = query_leanstral(prompt, context=context, api_key=api_key)
+
+            # Strip markdown fences
+            result = re.sub(r"^```(?:lean)?\n?", "", result)
+            result = re.sub(r"\n?```$", "", result)
+            result = result.strip()
+
+            # Sanity checks
+            if "sorry" in result:
+                print(f"     ⚠️  Leanstral still returned sorry — keeping original")
+                continue
+            if len(result) < 10:
+                print(f"     ⚠️  Leanstral returned suspiciously short output — skipping")
+                continue
+
+            # Replace the block in the file
+            new_lines = lines[:block_start] + result.splitlines() + lines[block_end + 1:]
+            lines = new_lines
+
+            print(f"     ✅ Filled successfully")
+
+        except Exception as e:
+            print(f"     ❌ Error: {e}")
+
+    print()
+    return "\n".join(lines) + "\n"
+
+
+def write_inplace(filepath: str, new_content: str, backup: bool = True):
+    """Overwrite a file in place, optionally creating a .bak backup."""
+
+    if backup:
+        backup_path = filepath + ".bak"
+        import shutil
+        shutil.copy2(filepath, backup_path)
+        print(f"  💾 Backup saved: {os.path.basename(backup_path)}")
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(new_content)
+
+    print(f"  ✅ Updated: {filepath}")
+
+
+def process_file(filepath: str, api_key: str, inplace: bool = False,
+                 output: str = "", no_backup: bool = False):
+    """Process a single .lean file: fill sorry's and write result."""
+
+    result = fill_sorries(filepath, api_key)
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        original = f.read()
+
+    # If nothing changed (no sorry found), skip writing
+    if result == original:
+        return False
+
+    if inplace:
+        write_inplace(filepath, result, backup=not no_backup)
+        return True
+    elif output:
+        with open(output, "w", encoding="utf-8") as f:
+            f.write(result)
+        print(f"  ✅ Written to: {output}")
+        return True
+    else:
+        print(result)
+        return True
+
+
+def process_directory(dirpath: str, api_key: str, no_backup: bool = False):
+    """Scan a directory for .lean files with sorry's and fill them in place."""
+
+    lean_files = []
+    for root, _dirs, files in os.walk(dirpath):
+        for fname in sorted(files):
+            if fname.endswith(".lean"):
+                lean_files.append(os.path.join(root, fname))
+
+    if not lean_files:
+        print(f"No .lean files found in {dirpath}")
+        return
+
+    # Filter to only files containing sorry
+    sorry_files = []
+    for fpath in lean_files:
+        with open(fpath, "r", encoding="utf-8") as f:
+            if "sorry" in f.read():
+                sorry_files.append(fpath)
+
+    if not sorry_files:
+        print(f"No sorry's found in any .lean files under {dirpath}")
+        return
+
+    print(f"Found {len(sorry_files)} file(s) with sorry's:")
+    for fpath in sorry_files:
+        print(f"  • {os.path.relpath(fpath, dirpath)}")
+    print()
+
+    filled = 0
+    for i, fpath in enumerate(sorry_files, 1):
+        print(f"[{i}/{len(sorry_files)}] Processing {os.path.relpath(fpath, dirpath)}...")
+        try:
+            if process_file(fpath, api_key, inplace=True, no_backup=no_backup):
+                filled += 1
+        except Exception as e:
+            print(f"  ❌ Error: {e}")
+        print()
+
+    print(f"Done! Filled sorry's in {filled}/{len(sorry_files)} file(s).")
+
+
+def watch_mode(dirpath: str, api_key: str, interval: int = 5, no_backup: bool = False):
+    """Watch a directory for .lean files with sorry's and auto-fill them."""
+
+    import time
+
+    print("=" * 60)
+    print("  Leanstral 1.5 — Watch Mode")
+    print("=" * 60)
+    print(f"  Watching: {dirpath}")
+    print(f"  Interval: {interval}s")
+    print(f"  Press Ctrl+C to stop")
+    print("=" * 60)
+    print()
+
+    # Track files we've already processed (by content hash)
+    processed = {}
+
+    try:
+        while True:
+            for root, _dirs, files in os.walk(dirpath):
+                for fname in sorted(files):
+                    if not fname.endswith(".lean"):
+                        continue
+                    fpath = os.path.join(root, fname)
+
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        content = f.read()
+
+                    if "sorry" not in content:
+                        continue
+
+                    # Hash content to detect changes
+                    import hashlib
+                    content_hash = hashlib.md5(content.encode()).hexdigest()
+
+                    if processed.get(fpath) == content_hash:
+                        continue  # Already processed this version
+
+                    rel = os.path.relpath(fpath, dirpath)
+                    print(f"[{time.strftime('%H:%M:%S')}] Detected sorry in {rel}")
+
+                    try:
+                        result = fill_sorries(fpath, api_key)
+                        with open(fpath, "r", encoding="utf-8") as f:
+                            original = f.read()
+                        if result != original:
+                            write_inplace(fpath, result, backup=not no_backup)
+                        # Mark as processed with NEW hash
+                        new_hash = hashlib.md5(result.encode()).hexdigest()
+                        processed[fpath] = new_hash
+                    except Exception as e:
+                        print(f"  ❌ Error: {e}")
+                        processed[fpath] = content_hash  # Don't retry same content
+
+                    print()
+
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        print("\nWatch mode stopped.")
+
+
+# ── Interactive Mode ──────────────────────────────────────────────
+
+def interactive_mode(api_key: str):
+    """Run an interactive loop where you paste theorem statements."""
+
+    print("=" * 60)
+    print("  Leanstral 1.5 — Interactive Proof Assistant")
+    print("=" * 60)
+    print()
+    print("Paste a Lean 4 theorem statement (with or without sorry).")
+    print("Press Enter twice to submit. Type 'quit' to exit.")
+    print()
+
+    while True:
+        print("─" * 60)
+        print("Enter your Lean 4 goal:")
+        print()
+
+        lines = []
+        empty_count = 0
+        while True:
+            try:
+                line = input()
+            except EOFError:
+                break
+            if line.strip() == "quit":
+                print("Goodbye!")
+                return
+            if line == "":
+                empty_count += 1
+                if empty_count >= 2:
+                    break
+                lines.append(line)
+            else:
+                empty_count = 0
+                lines.append(line)
+
+        goal = "\n".join(lines).strip()
+        if not goal:
+            continue
+
+        print()
+        print("⏳ Querying Leanstral 1.5...")
+        print()
+
+        try:
+            result = query_leanstral(goal, api_key=api_key)
+            print("✅ Completed proof:")
+            print()
+            print(result)
+            print()
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            print()
+
+
+# ── CLI Entry Point ───────────────────────────────────────────────
+
+def main():
+    global _model
+
+    parser = argparse.ArgumentParser(
+        description="Leanstral 1.5 — Lean 4 Proof Assistant",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""\
+Examples:
+  # Interactive mode
+  python leanstral.py
+
+  # Single goal
+  python leanstral.py --goal "theorem foo : 1 + 1 = 2 := by sorry"
+
+  # Fill sorry's and print to stdout
+  python leanstral.py --file Proof/MyTheorem.lean
+
+  # Fill sorry's and overwrite the file directly (saves .bak backup)
+  python leanstral.py --file Proof/MyTheorem.lean --inplace
+
+  # Fill sorry's in ALL .lean files under a directory
+  python leanstral.py --dir Proof/
+
+  # Watch mode: auto-fill sorry's as you write them
+  python leanstral.py --watch Proof/
+        """,
+    )
+    parser.add_argument(
+        "--goal", "-g",
+        type=str,
+        help="A single Lean 4 theorem statement to complete",
+    )
+    parser.add_argument(
+        "--file", "-f",
+        type=str,
+        help="A .lean file with sorry's to fill",
+    )
+    parser.add_argument(
+        "--inplace", "-i",
+        action="store_true",
+        help="Overwrite the file in place (creates .bak backup)",
+    )
+    parser.add_argument(
+        "--no-backup",
+        action="store_true",
+        help="Skip creating .bak backup when using --inplace",
+    )
+    parser.add_argument(
+        "--output", "-o",
+        type=str,
+        help="Output file path (for --file mode). Defaults to stdout.",
+    )
+    parser.add_argument(
+        "--dir", "-d",
+        type=str,
+        help="Scan a directory for .lean files with sorry's and fill them all",
+    )
+    parser.add_argument(
+        "--watch", "-w",
+        type=str,
+        help="Watch a directory and auto-fill sorry's as they appear",
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=5,
+        help="Polling interval in seconds for --watch mode (default: 5)",
+    )
+    parser.add_argument(
+        "--model", "-m",
+        type=str,
+        default=DEFAULT_MODEL,
+        help=f"Model to use (default: {DEFAULT_MODEL})",
+    )
+
+    args = parser.parse_args()
+    _model = args.model
+
+    api_key = get_api_key()
+
+    # ── Single goal mode ──
+    if args.goal:
+        result = query_leanstral(args.goal, api_key=api_key)
+        print(result)
+        return
+
+    # ── File mode ──
+    if args.file:
+        if not os.path.exists(args.file):
+            print(f"ERROR: File not found: {args.file}")
+            sys.exit(1)
+
+        process_file(args.file, api_key,
+                     inplace=args.inplace,
+                     output=args.output or "",
+                     no_backup=args.no_backup)
+        return
+
+    # ── Directory mode ──
+    if args.dir:
+        if not os.path.isdir(args.dir):
+            print(f"ERROR: Not a directory: {args.dir}")
+            sys.exit(1)
+
+        process_directory(args.dir, api_key, no_backup=args.no_backup)
+        return
+
+    # ── Watch mode ──
+    if args.watch:
+        if not os.path.isdir(args.watch):
+            print(f"ERROR: Not a directory: {args.watch}")
+            sys.exit(1)
+
+        watch_mode(args.watch, api_key,
+                   interval=args.interval,
+                   no_backup=args.no_backup)
+        return
+
+    # ── Interactive mode (default) ──
+    interactive_mode(api_key)
+
+
+if __name__ == "__main__":
+    main()
