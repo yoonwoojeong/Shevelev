@@ -416,8 +416,11 @@ def run_build(root: str) -> tuple[bool, str]:
     shorter proof without us noticing.
     """
     r = subprocess.run(["lake", "build"], cwd=root,
-                       capture_output=True, text=True)
-    return r.returncode == 0, (r.stdout or "") + (r.stderr or "")
+                       capture_output=True, text=False)
+    # Decode with errors='replace' to handle Unicode output on cp949 consoles.
+    stdout = r.stdout.decode("utf-8", errors="replace") if r.stdout else ""
+    stderr = r.stderr.decode("utf-8", errors="replace") if r.stderr else ""
+    return r.returncode == 0, stdout + stderr
 
 
 def _has_new_warning(output: str, filename: str) -> bool:
