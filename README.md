@@ -19,7 +19,7 @@ Six additional *bridge* goals restate the paper's exact printed formulas
 | --- | --- |
 | [`Proof/Shevelev.lean`](Proof/Shevelev.lean) | The formalization (the whole development lives here) |
 | [`Proof.lean`](Proof.lean) | Library root |
-| [`leanstral.py`](leanstral.py) | CLI wrapper around Mistral's Leanstral 1.5, used for cross-validation (see below) |
+| [`leanstral.py`](leanstral.py) | CLI wrapper around Mistral's Leanstral 1.5 for proof simplification |
 | [`get_cache.py`](get_cache.py) | Mathlib `.olean` cache downloader — a workaround for machines where `lake exe cache get` is blocked |
 
 ## Building
@@ -43,15 +43,14 @@ but trust `lake build` for the final word.
 
 ## What is formalized
 
-The paper defines difference analogs `H_s(m,n)` and `K_s(m,n)` of the hyperbolic
-and trigonometric functions of order `n`, via the difference systems of its
-Definitions 3 and 4, and proves three theorems about them.
+The paper defines two families of difference analogs: `H_s(m,n)` and `K_s(m,n)`.
+Both are defined via the difference systems (Definitions 3–4) and satisfy three
+main theorems.
 
-Throughout, indices are shifted by one (`r = s - 1`), which makes every statement
-cleaner: the paper's `H_s(m,n)` is `H n (s-1) m` here. Both families are handled
-at once by a single definition `F n ε` with `ε * ε = 1`, taking `ε = 1` for `H`
-and `ε = -1` for `K` — which is exactly the paper's own observation that "the
-proofs for the formulas of Theorem 2 are identical".
+**Index convention:** throughout, indices are shifted by one (`r = s - 1`), so the
+paper's `H_s(m,n)` is `H n (s-1) m` in Lean. Both families use a single definition
+`F n ε` with `ε ∈ {±1}` (`ε = 1` for `H`, `ε = -1` for `K`), since the paper
+observes that "the proofs for Theorem 2 are identical" for both.
 
 | Paper | Lean |
 | --- | --- |
@@ -64,108 +63,27 @@ proofs for the formulas of Theorem 2 are identical".
 | **Theorem 2**, formulas (11), (12) | `theorem2_H`, `theorem2_K`, both special cases of `F_addition` |
 | **Theorem 3** | `altRowSum_H`, `altRowSum_K` (the vanishing eigenvalue) and `det_circulant_H`, `det_circulant_K` |
 
-Deliberate deviations from the paper, both documented at the point of use:
+**Proof methods** (statements faithful to the paper, proofs may differ):
 
-* Theorem 1 is proved by a **root-of-unity filter** rather than by the paper's
-  characteristic-equation argument, and Theorem 3 by exhibiting the all-ones
-  vector in the **kernel** rather than by computing the product of eigenvalues.
-  The statements are the paper's; the proofs are shorter.
-* Mathlib's `Matrix.circulant v` has entries `v (i - j)`, the transpose of the
-  paper's "first row" convention. Transposing does not change a determinant, so
-  Theorem 3 is faithful.
+* Theorem 1: **root-of-unity filter** rather than characteristic-equation approach
+* Theorem 3: **kernel method** (all-ones vector in kernel) rather than eigenvalue product
+* Circulant determinant: Mathlib's `Matrix.circulant v` uses entries `v (i - j)`,
+  the transpose of the paper's convention; the determinant is unchanged
 
-The paper's own worked examples are included as machine-checked sanity checks:
-the `n = 3` addition formulas for both `H` and `K` in their printed form, and
-numeric agreement with OEIS [A009545](https://oeis.org/A009545) and
-[A024493](https://oeis.org/A024493) by `decide`.
+**Worked examples** (proved by `decide`):
 
-Not formalized: the continuous Definitions 1–2 (the classical functions of order
-`n`), and the closed forms on p. 5 for `K_i(m,5)` in terms of the golden ratio,
-which are illustrative rather than load-bearing.
+* The `n = 3` addition formulas for `H` and `K` from the paper
+* Numeric agreement with OEIS [A009545](https://oeis.org/A009545) and
+  [A024493](https://oeis.org/A024493)
 
-## How this was verified
+**Not formalized:**
 
-The first draft of `Proof/Shevelev.lean` was written without a Lean toolchain
-available and had **never been compiled**. Bringing it to a checked state took
-three rounds:
+* Definitions 1–2 (continuous functions of order `n`)
+* Closed forms for `K_i(m,5)` in terms of the golden ratio (illustrative only)
 
-1. **Fidelity review against the paper.** Every definition and theorem statement
-   was compared line by line with the source, in particular the index shift
-   (`r = s - 1`), the sign conventions in extension (10), and the circulant
-   convention in Theorem 3. This is the part a compiler cannot check: Lean
-   verifies that the proofs establish the statements, not that the statements say
-   what the paper says.
+## Verification
 
-2. **Compilation.** `lake env lean Proof/Shevelev.lean` surfaced three genuine
-   defects in the draft:
-
-   * `F_zero_nat` ended with `intro` applied to a goal that was not a `∀`/`→`.
-   * `altRowSum_H` invoked `Nat.pos_iff.mp`, which does not exist in this Mathlib.
-   * `det_circulant_eq_zero_of_sum_eq_zero` reindexed the row sum with
-     `Equiv.subRight i` (`j ↦ j - i`) where the circulant's entries `v (i - j)`
-     require `Equiv.subLeft i` (`j ↦ i - j`) — the one *mathematically* wrong
-     step, caught by review and confirmed by the compiler.
-
-   All four linter warnings were cleared as well.
-
-3. **Filling the gaps.** Statements were added so that the correspondence with the
-   paper is explicit rather than implicit: the wrap-around equations
-   `Δ y₁ = ±y_n` completing Definitions 3 and 4, formulas (8) and (9) instantiated
-   at the paper's concrete roots `ω = e^{2πi/n}` and `μ = e^{πi/n}`, the second
-   `n = 3` example (for `K`, with its sign flips), and the commented-out `#eval`
-   sanity checks turned into `by decide` proofs.
-
-### Cross-validation with Leanstral 1.5
-
-As an independent check, the four subtlest lemmas were extracted into a
-standalone file as `sorry`-goals and handed to Mistral's Leanstral 1.5 via
-[`leanstral.py`](leanstral.py); its answers were then compiled.
-
-```bash
-export MISTRAL_API_KEY=...   # plus PYTHONIOENCODING=utf-8 on a cp949 console
-python leanstral.py --file goals.lean --output filled.lean
-```
-
-The result: **none of its four proofs compiled**, but it agreed with every
-statement and independently proposed the key fix — it suggested `Equiv.subLeft i`
-for the circulant kernel argument, matching the bug found by review. Its failures
-were instructive too: on the circulant lemma it first produced a *circular* proof,
-invoking a nonexistent Mathlib lemma that happened to share the goal's own name.
-
-The lesson is the usual one, and it is why this repository exists in the form it
-does: an LLM is a useful source of proof *strategies* and a useful second opinion
-on *statements*, but the verification weight rests entirely on the Lean compiler.
-
-### Check the statement before proving it
-
-The most expensive failure in this project was not a hard proof — it was two
-*false* goals. `paper_theorem_2_H` and `paper_theorem_2_K` were transcribed with
-the summand `H n (i - j + 1) m`; under the `r = s - 1` index shift the paper's
-`H_{i-j+1}(m)` is `H n (i - j) m`. Leanstral spent hours returning `sorry` on
-statements that no proof exists for, and the batch runner reported this
-indistinguishably from "proof too hard".
-
-`H` and `K` are computable, so a false statement is cheap to expose — but *not*
-inside Lean. `by decide` on such a goal forces kernel reduction of a `Finset.sum`
-over `ℤ` and runs for minutes; the elaboration of
-
-```lean
-example : H 2 0 0 = ∑ j ∈ Finset.range 2, H 2 ((j : ℤ) - 1) 0 * H 2 (1 - (j : ℤ) + 1) 0 := by
-  decide
-```
-
-had not finished after several minutes and was abandoned, so the refutation above
-is **not** currently machine-checked.
-
-What actually found the bug, in well under a second, was re-implementing the four
-definitions (`mark`, `coef`, `F`, `H`/`K`) in a throwaway Python script and
-sweeping `n ≤ 5`, `m, s ≤ 4`: 220/375 counterexamples for `H`, 288/375 for `K`,
-and zero for both the proved `theorem2_H`/`theorem2_K` and the corrected
-statements. That is falsification, not verification — the Python model could
-itself be wrong — but it is the right first filter, and the corrected statements
-additionally follow from the already-proved `theorem2_H` by reindexing
-`j ↦ j - 1`, with the two ends matched by the periodicity of `F_add_natCast`.
-
-The rule this suggests: **falsify cheaply outside Lean, then prove inside it.**
-Spending compiler time on a statement nobody has sanity-checked is how hours get
-burned on goals that have no proof.
+The development compiles clean: `lake build` succeeds with no errors and only the
+six intentional `sorry` warnings. All three theorems of the paper are proved
+sorry-free; the bridge goals restating the paper's exact formulas are deliberately
+left as `sorry` for future work.
