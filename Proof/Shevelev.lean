@@ -657,4 +657,46 @@ example (m s : ℕ) :
     linarith
   simpa [Finset.sum_range_succ, h1, h2, sub_eq_add_neg] using h
 
+/-! ## 7. Bridge goals: paper's formulas as direct consequences
+
+The paper's Theorems 1–3 are formalized above under our index-shifted convention
+(r = s - 1). These bridge goals state the paper's formulas *exactly as printed*,
+with the paper's original indexing, and ask Leanstral to derive them from our API.
+
+A passing bridge proves that every claim in the paper follows from the
+formalization — a machine-checked soundness check.
+-/
+
+theorem paper_theorem_1_H (n : ℕ) (hn : 0 < n) {ζ : ℂ} (hζ : IsPrimitiveRoot ζ n)
+    (m : ℕ) (s : ℕ) (hs : 1 ≤ s) (hs' : s ≤ n) :
+    ((H n ((s : ℤ) - 1) m : ℤ) : ℂ)
+      = (n : ℂ)⁻¹ * ∑ j ∈ range n, (ζ ^ j + 1) ^ m * ζ ^ (-((j : ℤ) * ((s : ℤ) - 1))) := by
+  sorry
+
+theorem paper_theorem_1_K (n : ℕ) (hn : 0 < n) {μ : ℂ} (hμ0 : μ ≠ 0) (hμn : μ ^ n = -1)
+    (hμ2 : IsPrimitiveRoot (μ ^ 2) n) (m : ℕ) (s : ℕ) (hs : 1 ≤ s) (hs' : s ≤ n) :
+    ((K n ((s : ℤ) - 1) m : ℤ) : ℂ)
+      = (n : ℂ)⁻¹ * ∑ j ∈ range n, (μ ^ (2 * j + 1) + 1) ^ m * μ ^ (-((2 * (j : ℤ) + 1) * ((s : ℤ) - 1))) := by
+  sorry
+
+theorem paper_theorem_2_H (n : ℕ) (hn : 0 < n) (m s : ℕ)
+    (i : ℕ) (hi : 1 ≤ i) (hi' : i ≤ n) :
+    H n ((i : ℤ) - 1) (m + s)
+      = ∑ j ∈ range n, H n ((j : ℤ) - 1) s * H n (((i : ℤ) - (j : ℤ) + 1)) m := by
+  sorry
+
+theorem paper_theorem_2_K (n : ℕ) (hn : 0 < n) (m s : ℕ)
+    (i : ℕ) (hi : 1 ≤ i) (hi' : i ≤ n) :
+    K n ((i : ℤ) - 1) (m + s)
+      = ∑ j ∈ range n, K n ((j : ℤ) - 1) s * K n (((i : ℤ) - (j : ℤ) + 1)) m := by
+  sorry
+
+theorem paper_theorem_3_H_det (n : ℕ) [NeZero n] (hev : Even n) {m : ℕ} (hm : 1 ≤ m) :
+    (Matrix.circulant fun (i : Fin n) => (-1 : ℤ) ^ (i : ℕ) * H n ((i : ℕ) : ℤ) m).det = 0 := by
+  sorry
+
+theorem paper_theorem_3_K_det (n : ℕ) [NeZero n] (hodd : Odd n) {m : ℕ} (hm : 1 ≤ m) :
+    (Matrix.circulant fun (i : Fin n) => (-1 : ℤ) ^ (i : ℕ) * K n ((i : ℕ) : ℤ) m).det = 0 := by
+  sorry
+
 end Shevelev
