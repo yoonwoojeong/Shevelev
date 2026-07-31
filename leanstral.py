@@ -498,6 +498,115 @@ def _statement_of(block: str) -> str | None:
     return None
 
 
+def inspect_file(filepath: str, api_key: str, output_report: str = "",
+                 max_decls: int = 0) -> None:
+    """Collect Leanstral's proof simplifications for manual review.
+
+    For each theorem/lemma, get Leanstral's candidate proof and save it to a
+    report file WITHOUT applying the build gate or statement-lock checks.
+    This lets you compare original vs candidate side-by-side and decide which
+    to keep, then iterate on the prompt based on what you observe.
+
+    Output report format:
+      [N/total] name
+        original (Nchars): ... first 100 chars ...
+        candidate (Nchars): ... first 100 chars ...
+        status: (ok|statement_changed|no_proof|error)
+        reason: ...
+
+    To apply selected candidates manually, edit the report, then use --simplify
+    with a refined prompt based on what you learned.
+    """
+    root = find_project_root(filepath)
+    print(f"  Project root: {root}")
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        lines = f.read().splitlines()
+
+    decls = list(_iter_decls(lines))
+    if max_decls > 0:
+        decls = decls[:max_decls]
+
+    if output_report:
+        report = open(output_report, "w", encoding="utf-8")
+        print(f"  Saving inspection report to: {output_report}\n")
+    else:
+        report = None
+
+    def log(msg: str):
+        print(msg, flush=True)
+        if report:
+            report.write(msg + "\n")
+
+    log(f"Leanstral Proof Simplification Inspection")
+    log(f"File: {filepath}")
+    log(f"Declarations: {len(decls)}\n")
+
+    inspected = 0
+    for n, (kind, start, end) in enumerate(decls, 1):
+        block = "\n".join(lines[start:end + 1])
+        sig = _statement_of(block)
+        name = lines[start].strip()[:80]
+
+        log(f"\n[{n}/{len(decls)}] {kind.upper()} {name}")
+        log(f"  lines {start+1}-{end+1}")
+
+        if sig is None:
+            log(f"  status: NO_STATEMENT")
+            continue
+
+        prompt = (
+            "Below is a COMPLETE, already-compiling Lean 4 theorem/lemma. "
+            "Return a version with a shorter or more idiomatic proof.\n"
+            "HARD CONSTRAINTS:\n"
+            "  - Keep the statement (everything up to `:=`) EXACTLY as given.\n"
+            "  - Keep the same declaration name.\n"
+            "  - Return ONLY the theorem/lemma, no fences, no commentary, no imports.\n\n"
+            f"```lean\n{block}\n```"
+        )
+
+        try:
+            result = query_leanstral(prompt, context="", api_key=api_key)
+        except Exception as e:
+            log(f"  status: QUERY_ERROR")
+            log(f"  error: {e}")
+            continue
+
+        result = re.sub(r"^```(?:lean)?\n?", "", result)
+        result = re.sub(r"\n?```$", "", result).strip()
+
+        orig_chars = len("".join(block.split()))
+        cand_chars = len("".join(result.split()))
+
+        log(f"  original chars: {orig_chars}")
+        log(f"  candidate chars: {cand_chars}")
+        log(f"  delta: {cand_chars - orig_chars:+d} chars")
+
+        if "sorry" in result:
+            log(f"  status: INCOMPLETE (still has sorry)")
+            log(f"  reason: Leanstral could not complete the proof")
+        elif _statement_of(result) != sig:
+            log(f"  status: STATEMENT_CHANGED")
+            log(f"  reason: Proof statement does not match original")
+        elif cand_chars >= orig_chars:
+            log(f"  status: NOT_SHORTER")
+            log(f"  reason: Candidate is not shorter than original")
+        else:
+            log(f"  status: OK_SHORTER")
+            log(f"  saved for review")
+
+        log(f"  original (first 120 chars):")
+        log(f"    {block[:120].replace(chr(10), ' ')}")
+        log(f"  candidate (first 120 chars):")
+        log(f"    {result[:120].replace(chr(10), ' ')}")
+
+        inspected += 1
+
+    log(f"\n\nInspection complete: {inspected} declarations reviewed")
+    if report:
+        report.close()
+
+
 def simplify_file(filepath: str, api_key: str, max_decls: int = 0,
                   min_shrink: int = 8) -> int:
     """Ask Leanstral for a cleaner proof of each theorem/lemma, keeping a
@@ -747,6 +856,20 @@ Examples:
         help="Polling interval in seconds for --watch mode (default: 5)",
     )
     parser.add_argument(
+        "--inspect",
+        type=str,
+        help="Inspection mode: collect Leanstral's proof simplifications for each "
+             "theorem/lemma WITHOUT applying build gates. Save candidates to a report "
+             "so you can compare originals vs proposals and iterate on the prompt. "
+             "Use --report to save the inspection report.",
+    )
+    parser.add_argument(
+        "--report",
+        type=str,
+        default="",
+        help="Save inspection report to this file (used with --inspect).",
+    )
+    parser.add_argument(
         "--simplify", "-s",
         type=str,
         help="Readability pass: replace each theorem/lemma proof in FILE with a "
@@ -783,6 +906,15 @@ Examples:
     if args.goal:
         result = query_leanstral(args.goal, api_key=api_key)
         print(result)
+        return
+
+    # ── Inspect mode ──
+    if args.inspect:
+        if not os.path.exists(args.inspect):
+            print(f"ERROR: File not found: {args.inspect}")
+            sys.exit(1)
+        inspect_file(args.inspect, api_key, output_report=args.report,
+                     max_decls=args.max_decls)
         return
 
     # ── Simplify (readability) mode ──
