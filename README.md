@@ -34,7 +34,10 @@ To typecheck the single file directly (takes a few minutes, since it does
 lake env lean Proof/Shevelev.lean
 ```
 
-Silence means success.
+Note that this is a *weaker* check than `lake build`: `lake env lean` does not
+apply the `leanOptions` from `lakefile.toml`, so it silently skips the
+`mathlibStandardSet` style linters that CI runs. Use it for a fast inner loop,
+but trust `lake build` for the final word.
 
 ## What is formalized
 
