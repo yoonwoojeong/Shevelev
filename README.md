@@ -134,6 +134,58 @@ The lesson is the usual one, and it is why this repository exists in the form it
 does: an LLM is a useful source of proof *strategies* and a useful second opinion
 on *statements*, but the verification weight rests entirely on the Lean compiler.
 
+### `leantool.py` — Leanstral on demand
+
+The batch modes above (`--simplify`, `--bridge`, `--inspect`) walk the whole file
+unattended and re-run `lake build` after every candidate. Since `Shevelev.lean`
+does `import Mathlib`, one build is ~3–5 minutes, so a full pass costs hours and
+reports only accept/reject. [`leantool.py`](leantool.py) replaces that with three
+fixes:
+
+* **A warm compiler — implemented, not yet working.** `lake serve` is started
+  once and one scratch file held open, so Mathlib would load a single time and
+  each later check re-elaborate only the snippet. **As of this commit the cold
+  start does not complete**: the server never reports the initial file as
+  finished, and `LeanServer.check` raises after its timeout. `lean_check_fast`
+  therefore falls back to a one-shot `lake env lean` (~5 min) on every call, so
+  nothing is broken — it is merely as slow as before. See the caveats below.
+* **Real context.** The batch modes sent each theorem with `context=""`, so the
+  model had never seen `F`, `H`, `K` or `mark` and invented lemma names. Every
+  request now carries an auto-extracted API summary of the development —
+  signatures only, proof bodies stripped.
+* **An error feedback loop.** A rejected candidate used to be discarded silently.
+  `solve` feeds the compiler's diagnostics back and asks again.
+
+```bash
+python leantool.py ask   "theorem foo (n : ℕ) : H n 0 0 = 1 := by sorry"
+python leantool.py solve "theorem foo (n : ℕ) : H n 0 0 = 1 := by sorry" -n 3
+python leantool.py check snippet.lean
+python leantool.py api          # the context summary sent with every request
+python leantool.py bench        # cold vs warm check timings
+```
+
+The same functions are exposed as MCP tools (`lean_check`, `leanstral_ask`,
+`leanstral_solve`, `lean_api_summary`) via [`.mcp.json`](.mcp.json), so an agent
+can call them directly. A long-lived MCP server is the setting in which a warm
+worker would pay for itself — which is why finishing that path is the next job.
+
+#### Caveats, and one that cost real time
+
+Getting the language-server checker wrong is worse than not having it. Two
+failure modes were hit here, both of which reported **success on a false goal**:
+
+1. Diagnostics were not matched to the submitted document version, so each check
+   returned the *previous* snippet's result.
+2. `textDocument/publishDiagnostics` is streamed *during* elaboration. An empty
+   diagnostics array mid-run means "nothing wrong yet", not "nothing wrong".
+   The only sound completion signal is `$/lean/fileProgress` with
+   `processing == []` for the matching version.
+
+Because of this, `leantool.solve` calls `verify_harness()` first: it submits a
+trivially true goal and a trivially false one, and refuses to return any verdict
+unless the checker tells them apart. A proof tool that can silently pass a false
+statement is not a weak tool, it is a harmful one.
+
 ### Check the statement before proving it
 
 The most expensive failure in this project was not a hard proof — it was two

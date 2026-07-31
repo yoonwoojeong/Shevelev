@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "leanstral": {
+      "command": "python",
+      "args": ["leantool.py", "mcp"],
+      "env": {
+        "MISTRAL_API_KEY": "${MISTRAL_API_KEY}",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}
