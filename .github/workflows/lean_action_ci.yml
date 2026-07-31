@@ -5,16 +5,29 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+# Least privilege by default; the docs job widens this for itself.
 permissions:
-  contents: read # Read access to repository contents
-  pages: write # Write access to GitHub Pages
-  id-token: write # Write access to ID tokens
+  contents: read
 
 jobs:
+  # Runs on every push and PR. Uses the Mathlib olean cache (`lake exe cache
+  # get`), so this is a few minutes, not a Mathlib rebuild.
   build:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: leanprover/lean-action@v1
 
+  # Documentation generation (doc-gen4) has no cache for Mathlib, so it
+  # re-processes the entire `import Mathlib` closure every run (~hours). Restrict
+  # it to pushes to master so PRs and feature-branch pushes stay fast.
+  docs:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write # Write access to GitHub Pages
+      id-token: write # Write access to ID tokens
     steps:
       - uses: actions/checkout@v5
       - uses: leanprover/lean-action@v1
