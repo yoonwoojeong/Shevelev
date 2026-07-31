@@ -1,6 +1,11 @@
-/-
-# Combinatorial identities from difference analogs of hyperbolic and
-# trigonometric functions of order `n`
+import Mathlib
+
+-- This is a standalone project rather than a Mathlib file, so it carries no
+-- Mathlib copyright header; the rest of the `mathlibStandardSet` linters are on.
+set_option linter.style.header false
+
+/-!
+# Combinatorial identities from difference analogs of hyperbolic and trigonometric functions
 
 A Lean 4 / Mathlib formalization of
 
@@ -11,17 +16,18 @@ A Lean 4 / Mathlib formalization of
 
 Indices are shifted by one (`r = s - 1`), which makes every statement cleaner:
 
-| paper                          | here                                   |
-| ------------------------------ | -------------------------------------- |
-| `H_s(m,n)`, formula (13)       | `H n (s-1) m = F n 1 (s-1) m`          |
-| `K_s(m,n)`, formula (14)       | `K n (s-1) m = F n (-1) (s-1) m`       |
-| extension (10)                 | `F_add_natCast` : `F n ε (r+n) m = ε * F n ε r m` |
-| difference systems (6),(7)     | `F_succ` : `F n ε r (m+1) = F n ε r m + F n ε (r-1) m` |
-| wrap-around `Δy₁ = ±yₙ`        | `H_delta_one` / `K_delta_one`          |
-| Theorem 1, (8)/(9)             | `theorem1_H` / `theorem1_K` (any primitive root) |
-| (8)/(9) with `ω = e^{2πi/n}`, `μ = e^{πi/n}` | `theorem1_H_exp` / `theorem1_K_exp` |
-| Theorem 2, (11)/(12)           | `theorem2_H` / `theorem2_K`            |
-| Theorem 3                      | `altRowSum_H`/`altRowSum_K` and `det_circulant_H`/`det_circulant_K` |
+| paper                     | here                                                 |
+| ------------------------- | ---------------------------------------------------- |
+| `H_s(m,n)`, formula (13)  | `H n (s-1) m = F n 1 (s-1) m`                        |
+| `K_s(m,n)`, formula (14)  | `K n (s-1) m = F n (-1) (s-1) m`                     |
+| extension (10)            | `F_add_natCast` : `F n ε (r+n) m = ε * F n ε r m`    |
+| systems (6),(7)           | `F_succ` : `F n ε r (m+1) = F n ε r m + F n ε (r-1) m` |
+| wrap-around `Δy₁ = ±yₙ`   | `H_delta_one` / `K_delta_one`                        |
+| Theorem 1, (8)/(9)        | `theorem1_H` / `theorem1_K` (any primitive root)     |
+| (8)/(9) at the paper's roots | `theorem1_H_exp` / `theorem1_K_exp`               |
+| Theorem 2, (11)/(12)      | `theorem2_H` / `theorem2_K`                          |
+| Theorem 3, eigenvalue     | `altRowSum_H` / `altRowSum_K`                        |
+| Theorem 3, determinant    | `det_circulant_H` / `det_circulant_K`                |
 
 Formulas (13),(14) are taken as the *definition* of `H` and `K`; the fact that they
 solve the difference systems of Definitions 3 and 4 (which is the paper's Section 2
@@ -32,8 +38,6 @@ observation that "the proofs for the formulas of Theorem 2 are identical".
 
 The file compiles with Lean 4.30.0 / Mathlib v4.30.0 and contains no `sorry`.
 -/
-
-import Mathlib
 
 namespace Shevelev
 
@@ -255,7 +259,8 @@ lemma shift_sum (n : ℕ) {ε : ℤ} (hε : ε * ε = 1) (hn : 0 < n) (a : ℤ) 
 /-- **Theorem 2** (addition formulas), in the uniform form for `F`.
 With `ε = 1` this is (11), with `ε = -1` it is (12). -/
 theorem F_addition (n : ℕ) {ε : ℤ} (hε : ε * ε = 1) (hn : 0 < n) (m : ℕ) :
-    ∀ (s : ℕ) (a : ℤ), F n ε a (m + s) = ∑ b ∈ range n, F n ε (b : ℤ) s * F n ε (a - (b : ℤ)) m := by
+    ∀ (s : ℕ) (a : ℤ), F n ε a (m + s)
+      = ∑ b ∈ range n, F n ε (b : ℤ) s * F n ε (a - (b : ℤ)) m := by
   intro s
   induction s with
   | zero =>
