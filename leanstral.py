@@ -627,6 +627,25 @@ def simplify_file(filepath: str, api_key: str, max_decls: int = 0,
     with open(filepath, "r", encoding="utf-8") as f:
         lines = f.read().splitlines()
 
+    # A candidate is written to disk *before* it is built, so if this process is
+    # interrupted between the write and the revert the source is left broken.
+    # Keep a pristine copy and restore it on any abnormal exit.
+    import atexit
+    import shutil
+    pristine = "\n".join(lines) + "\n"
+    shutil.copy2(filepath, filepath + ".bak")
+    print(f"  💾 Backup: {os.path.basename(filepath)}.bak")
+
+    _state = {"done": False}
+
+    def _restore_if_interrupted():
+        if not _state["done"]:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(pristine)
+            print(f"\n  ↩  Interrupted — {os.path.basename(filepath)} restored.")
+
+    atexit.register(_restore_if_interrupted)
+
     decls = list(_iter_decls(lines))
     if max_decls > 0:
         decls = decls[:max_decls]
@@ -689,6 +708,7 @@ def simplify_file(filepath: str, api_key: str, max_decls: int = 0,
     # Ensure the on-disk file matches our accepted state.
     with open(filepath, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
+    _state["done"] = True
     print(f"\n  Done: {replaced} proof(s) shortened, statements unchanged.")
     return replaced
 

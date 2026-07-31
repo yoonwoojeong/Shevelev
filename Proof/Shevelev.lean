@@ -676,19 +676,20 @@ theorem paper_theorem_1_H (n : ℕ) (hn : 0 < n) {ζ : ℂ} (hζ : IsPrimitiveRo
 theorem paper_theorem_1_K (n : ℕ) (hn : 0 < n) {μ : ℂ} (hμ0 : μ ≠ 0) (hμn : μ ^ n = -1)
     (hμ2 : IsPrimitiveRoot (μ ^ 2) n) (m : ℕ) (s : ℕ) (hs : 1 ≤ s) (hs' : s ≤ n) :
     ((K n ((s : ℤ) - 1) m : ℤ) : ℂ)
-      = (n : ℂ)⁻¹ * ∑ j ∈ range n, (μ ^ (2 * j + 1) + 1) ^ m * μ ^ (-((2 * (j : ℤ) + 1) * ((s : ℤ) - 1))) := by
+      = (n : ℂ)⁻¹ * ∑ j ∈ range n,
+          (μ ^ (2 * j + 1) + 1) ^ m * μ ^ (-((2 * (j : ℤ) + 1) * ((s : ℤ) - 1))) := by
   sorry
 
 theorem paper_theorem_2_H (n : ℕ) (hn : 0 < n) (m s : ℕ)
     (i : ℕ) (hi : 1 ≤ i) (hi' : i ≤ n) :
     H n ((i : ℤ) - 1) (m + s)
-      = ∑ j ∈ range n, H n ((j : ℤ) - 1) s * H n (((i : ℤ) - (j : ℤ) + 1)) m := by
+      = ∑ j ∈ range n, H n ((j : ℤ) - 1) s * H n ((i : ℤ) - (j : ℤ)) m := by
   sorry
 
 theorem paper_theorem_2_K (n : ℕ) (hn : 0 < n) (m s : ℕ)
     (i : ℕ) (hi : 1 ≤ i) (hi' : i ≤ n) :
     K n ((i : ℤ) - 1) (m + s)
-      = ∑ j ∈ range n, K n ((j : ℤ) - 1) s * K n (((i : ℤ) - (j : ℤ) + 1)) m := by
+      = ∑ j ∈ range n, K n ((j : ℤ) - 1) s * K n ((i : ℤ) - (j : ℤ)) m := by
   sorry
 
 theorem paper_theorem_3_H_det (n : ℕ) [NeZero n] (hev : Even n) {m : ℕ} (hm : 1 ≤ m) :

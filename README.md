@@ -133,3 +133,37 @@ invoking a nonexistent Mathlib lemma that happened to share the goal's own name.
 The lesson is the usual one, and it is why this repository exists in the form it
 does: an LLM is a useful source of proof *strategies* and a useful second opinion
 on *statements*, but the verification weight rests entirely on the Lean compiler.
+
+### Check the statement before proving it
+
+The most expensive failure in this project was not a hard proof — it was two
+*false* goals. `paper_theorem_2_H` and `paper_theorem_2_K` were transcribed with
+the summand `H n (i - j + 1) m`; under the `r = s - 1` index shift the paper's
+`H_{i-j+1}(m)` is `H n (i - j) m`. Leanstral spent hours returning `sorry` on
+statements that no proof exists for, and the batch runner reported this
+indistinguishably from "proof too hard".
+
+`H` and `K` are computable, so a false statement is cheap to expose — but *not*
+inside Lean. `by decide` on such a goal forces kernel reduction of a `Finset.sum`
+over `ℤ` and runs for minutes; the elaboration of
+
+```lean
+example : H 2 0 0 = ∑ j ∈ Finset.range 2, H 2 ((j : ℤ) - 1) 0 * H 2 (1 - (j : ℤ) + 1) 0 := by
+  decide
+```
+
+had not finished after several minutes and was abandoned, so the refutation above
+is **not** currently machine-checked.
+
+What actually found the bug, in well under a second, was re-implementing the four
+definitions (`mark`, `coef`, `F`, `H`/`K`) in a throwaway Python script and
+sweeping `n ≤ 5`, `m, s ≤ 4`: 220/375 counterexamples for `H`, 288/375 for `K`,
+and zero for both the proved `theorem2_H`/`theorem2_K` and the corrected
+statements. That is falsification, not verification — the Python model could
+itself be wrong — but it is the right first filter, and the corrected statements
+additionally follow from the already-proved `theorem2_H` by reindexing
+`j ↦ j - 1`, with the two ends matched by the periodicity of `F_add_natCast`.
+
+The rule this suggests: **falsify cheaply outside Lean, then prove inside it.**
+Spending compiler time on a statement nobody has sanity-checked is how hours get
+burned on goals that have no proof.

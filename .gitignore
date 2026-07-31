@@ -1,2 +1,4 @@
 /.lake
 __pycache__/
+inspect_report.txt
+inspect_run.log
