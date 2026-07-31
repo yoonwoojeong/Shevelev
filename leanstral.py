@@ -20,6 +20,7 @@ import sys
 import json
 import argparse
 import re
+import subprocess
 
 try:
     import httpx
@@ -393,6 +394,229 @@ def watch_mode(dirpath: str, api_key: str, interval: int = 5, no_backup: bool = 
         print("\nWatch mode stopped.")
 
 
+# ── Compilation helpers (shared by simplify / bridge modes) ───────
+
+def find_project_root(path: str) -> str:
+    """Walk up from `path` to the directory holding a lakefile."""
+    d = os.path.dirname(os.path.abspath(path))
+    while d and d != os.path.dirname(d):
+        if (os.path.exists(os.path.join(d, "lakefile.toml"))
+                or os.path.exists(os.path.join(d, "lakefile.lean"))):
+            return d
+        d = os.path.dirname(d)
+    return os.path.dirname(os.path.abspath(path))
+
+
+def run_build(root: str) -> tuple[bool, str]:
+    """Run `lake build` in `root`. Returns (compiled_ok, combined_output).
+
+    `lake build` (not `lake env lean`) is used deliberately: it applies the
+    `leanOptions` from lakefile.toml, so the mathlibStandardSet style linters
+    run. That way a "readability" pass can never trade a lint warning for a
+    shorter proof without us noticing.
+    """
+    r = subprocess.run(["lake", "build"], cwd=root,
+                       capture_output=True, text=True)
+    return r.returncode == 0, (r.stdout or "") + (r.stderr or "")
+
+
+def _has_new_warning(output: str, filename: str) -> bool:
+    """True if the build output reports a warning mentioning `filename`."""
+    base = os.path.basename(filename)
+    for line in output.splitlines():
+        if "warning:" in line and base in line:
+            return True
+    return False
+
+
+# ── Declaration parsing (statement-lock for the simplify pass) ────
+
+# A theorem/lemma/example keyword at the start of a line (MULTILINE so it can be
+# found inside a block that opens with a doc comment or attribute).
+_STMT_DECL = re.compile(r"(?m)^\s*(?:@\[[^\]]*\]\s*)?(theorem|lemma|example)\b")
+
+
+def _iter_decls(lines: list[str]):
+    """Yield (kind, start_idx, end_idx) for each theorem/lemma/example block.
+
+    `def`/`instance`/etc. are intentionally skipped: rewriting the body of a
+    *definition* changes its meaning, whereas a theorem's proof body does not.
+    """
+    # First pass: the keyword line of every eligible declaration.
+    kw_lines = []
+    for i, line in enumerate(lines):
+        m = re.match(r"^\s*(?:@\[[^\]]*\]\s*)?(theorem|lemma|example)\b", line)
+        if m:
+            kw_lines.append((i, m.group(1)))
+
+    # Second pass: extend each start up over its doc-comment / attribute preamble.
+    pre_starts = []
+    for kw, kind in kw_lines:
+        pre = kw
+        while pre > 0:
+            s = lines[pre - 1].strip()
+            if s.endswith("-/") or s.startswith("/-") or s.startswith("@[") or s.startswith("--"):
+                pre -= 1
+            else:
+                break
+        pre_starts.append((pre, kw, kind))
+
+    # A block ends just before the NEXT block's (pre-extended) start, so the
+    # ranges never overlap on a shared doc-comment line.
+    for idx, (pre, kw, kind) in enumerate(pre_starts):
+        end = pre_starts[idx + 1][0] - 1 if idx + 1 < len(pre_starts) else len(lines) - 1
+        while end > kw and lines[end].strip() == "":
+            end -= 1
+        yield kind, pre, end
+
+
+def _statement_of(block: str) -> str | None:
+    """The declaration's *type*, normalized: from the decl keyword up to the
+    top-level `:=` that begins the proof. Returns None if no such `:=` found.
+
+    Doc comments and attributes above the keyword are excluded, so rewording a
+    docstring is allowed while the mathematical statement stays locked.
+    """
+    m = _STMT_DECL.search(block)
+    if not m:
+        return None
+    kw_pos = m.start(1)  # position of the keyword itself
+    depth = 0
+    i = kw_pos
+    while i < len(block) - 1:
+        c = block[i]
+        if c in "([{⟨":
+            depth += 1
+        elif c in ")]}⟩":
+            depth -= 1
+        elif depth == 0 and block[i] == ":" and block[i + 1] == "=":
+            return " ".join(block[kw_pos:i].split())
+        i += 1
+    return None
+
+
+def simplify_file(filepath: str, api_key: str, max_decls: int = 0,
+                  min_shrink: int = 8) -> int:
+    """Ask Leanstral for a cleaner proof of each theorem/lemma, keeping a
+    candidate ONLY if the whole project still builds warning-free AND the
+    statement is byte-identical. Returns the number of proofs replaced.
+
+    Everything is compiler-gated: an imperfect suggestion is discarded, never
+    committed, so this pass can only shrink proofs or leave them untouched.
+    """
+    root = find_project_root(filepath)
+    print(f"  Project root: {root}")
+    print("  Baseline build (must be green before we start)...", flush=True)
+    ok, _ = run_build(root)
+    if not ok:
+        print("  ❌ Baseline build failed — fix the file before simplifying.")
+        return 0
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        lines = f.read().splitlines()
+
+    decls = list(_iter_decls(lines))
+    if max_decls > 0:
+        decls = decls[:max_decls]
+    print(f"  {len(decls)} theorem/lemma block(s) to try.\n")
+
+    replaced = 0
+    # Process last-to-first so earlier line indices stay valid after splicing.
+    for n, (kind, start, end) in enumerate(reversed(decls), 1):
+        block = "\n".join(lines[start:end + 1])
+        sig = _statement_of(block)
+        name = lines[start].strip()[:60]
+        print(f"  [{n}/{len(decls)}] lines {start+1}-{end+1}: {name}", flush=True)
+        if sig is None:
+            print("     ⏭  could not isolate statement — skipping")
+            continue
+
+        prompt = (
+            "Below is a COMPLETE, already-compiling Lean 4 theorem/lemma. "
+            "Return a version with a shorter or more idiomatic proof.\n"
+            "HARD CONSTRAINTS:\n"
+            "  - Keep the statement (everything up to `:=`) EXACTLY as given.\n"
+            "  - Keep the same declaration name.\n"
+            "  - Return ONLY the theorem/lemma, no fences, no commentary, no imports.\n\n"
+            f"```lean\n{block}\n```"
+        )
+        try:
+            result = query_leanstral(prompt, context="", api_key=api_key)
+        except Exception as e:
+            print(f"     ❌ query error: {e}")
+            continue
+        result = re.sub(r"^```(?:lean)?\n?", "", result)
+        result = re.sub(r"\n?```$", "", result).strip()
+
+        if "sorry" in result:
+            print("     ⏭  candidate contains sorry — rejected")
+            continue
+        if _statement_of(result) != sig:
+            print("     ⏭  statement changed — rejected (statement-lock)")
+            continue
+        # Non-whitespace length is our readability proxy.
+        if len("".join(result.split())) > len("".join(block.split())) - min_shrink:
+            print("     ⏭  not meaningfully shorter — skipping")
+            continue
+
+        # Try it: splice, build, keep only if green and warning-free.
+        candidate = lines[:start] + result.splitlines() + lines[end + 1:]
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(candidate) + "\n")
+        ok, out = run_build(root)
+        if ok and not _has_new_warning(out, filepath):
+            lines = candidate
+            replaced += 1
+            print(f"     ✅ accepted (−{len(''.join(block.split())) - len(''.join(result.split()))} chars)")
+        else:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n")
+            reason = "build failed" if not ok else "introduced a warning"
+            print(f"     ↩  reverted ({reason})")
+
+    # Ensure the on-disk file matches our accepted state.
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"\n  Done: {replaced} proof(s) shortened, statements unchanged.")
+    return replaced
+
+
+def bridge_file(filepath: str, api_key: str) -> int:
+    """Fidelity mode: fill `sorry`-ed *bridge* goals — statements you have
+    transcribed verbatim from the paper — using the surrounding development,
+    then certify each by a full build.
+
+    This is `fill_sorries` with a build gate bolted on: a bridge proof is only
+    kept if the project compiles, so a green run is a machine-checked proof
+    that your formalization implies the paper's printed claim.
+    """
+    root = find_project_root(filepath)
+    with open(filepath, "r", encoding="utf-8") as f:
+        original = f.read()
+
+    filled = fill_sorries(filepath, api_key)
+    if filled == original:
+        print("  No bridge sorries to fill.")
+        return 0
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(filled)
+    print("  Building to certify the bridge proofs...", flush=True)
+    ok, out = run_build(root)
+    if ok and not _has_new_warning(out, filepath):
+        print("  ✅ All bridge proofs compile — the paper's claims are certified "
+              "as consequences of the development.")
+        return 1
+    else:
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(original)
+        print("  ↩  Build not clean — reverted. Leanstral could not derive at "
+              "least one bridge from the current API (or added a warning).")
+        print("     Inspect the goal by hand; the statement may need adjusting, "
+              "or the bridge may genuinely not follow.")
+        return 0
+
+
 # ── Interactive Mode ──────────────────────────────────────────────
 
 def interactive_mode(api_key: str):
@@ -520,6 +744,27 @@ Examples:
         help="Polling interval in seconds for --watch mode (default: 5)",
     )
     parser.add_argument(
+        "--simplify", "-s",
+        type=str,
+        help="Readability pass: replace each theorem/lemma proof in FILE with a "
+             "shorter one, keeping it only if the project still builds warning-free "
+             "and the statement is unchanged (statement-locked, compiler-gated).",
+    )
+    parser.add_argument(
+        "--max-decls",
+        type=int,
+        default=0,
+        help="For --simplify: only try the first N declarations (0 = all). "
+             "Useful for a quick smoke test, since each candidate triggers a build.",
+    )
+    parser.add_argument(
+        "--bridge", "-b",
+        type=str,
+        help="Fidelity pass: fill the `sorry`-ed bridge goals in FILE (statements "
+             "transcribed from the paper) from the surrounding development, and keep "
+             "them only if the project compiles — certifying the paper's claims.",
+    )
+    parser.add_argument(
         "--model", "-m",
         type=str,
         default=DEFAULT_MODEL,
@@ -535,6 +780,22 @@ Examples:
     if args.goal:
         result = query_leanstral(args.goal, api_key=api_key)
         print(result)
+        return
+
+    # ── Simplify (readability) mode ──
+    if args.simplify:
+        if not os.path.exists(args.simplify):
+            print(f"ERROR: File not found: {args.simplify}")
+            sys.exit(1)
+        simplify_file(args.simplify, api_key, max_decls=args.max_decls)
+        return
+
+    # ── Bridge (fidelity) mode ──
+    if args.bridge:
+        if not os.path.exists(args.bridge):
+            print(f"ERROR: File not found: {args.bridge}")
+            sys.exit(1)
+        bridge_file(args.bridge, api_key)
         return
 
     # ── File mode ──
