@@ -6,16 +6,18 @@ A complete Lean 4 / Mathlib formalization of
 > hyperbolic and trigonometric functions of order n*,
 > [arXiv:1706.01454v4](https://arxiv.org/abs/1706.01454) [math.CO], 2017.
 
-All three theorems of the paper are formalized and machine-checked. The
-development contains **no `sorry`** and compiles cleanly — zero errors, zero
-warnings — against Lean `v4.30.0` / Mathlib `v4.30.0`.
+All three theorems of the paper are formalized and machine-checked against Lean
+`v4.30.0` / Mathlib `v4.30.0`: the core development — the difference systems,
+the closed formulas, and the vanishing determinants — is proved **sorry-free**.
+Six additional *bridge* goals restate the paper's exact printed formulas
+((8), (9), (11), (12) and Theorem 3) and are stated but left as `sorry`, so
+`lake build` reports six `declaration uses 'sorry'` warnings and no errors.
 
 ## Contents
 
 | File | Description |
 | --- | --- |
 | [`Proof/Shevelev.lean`](Proof/Shevelev.lean) | The formalization (the whole development lives here) |
-| [`Proof/Shevelev.lean.bak`](Proof/Shevelev.lean.bak) | Snapshot of the first draft, *before* it had ever been compiled — kept for comparison |
 | [`Proof.lean`](Proof.lean) | Library root |
 | [`leanstral.py`](leanstral.py) | CLI wrapper around Mistral's Leanstral 1.5, used for cross-validation (see below) |
 | [`get_cache.py`](get_cache.py) | Mathlib `.olean` cache downloader — a workaround for machines where `lake exe cache get` is blocked |

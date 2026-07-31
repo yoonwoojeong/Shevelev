@@ -36,7 +36,9 @@ opening remark, `Δ C(m,k) = C(m,k-1)`) is the lemma `F_succ` together with
 so `H` (`ε = 1`) and `K` (`ε = -1`) are handled at once — exactly the paper's
 observation that "the proofs for the formulas of Theorem 2 are identical".
 
-The file compiles with Lean 4.30.0 / Mathlib v4.30.0 and contains no `sorry`.
+The core development compiles sorry-free with Lean 4.30.0 / Mathlib v4.30.0. The
+six `paper_*` bridge goals at the end restate the paper's exact printed formulas
+and are deliberately left as `sorry` (so `lake build` emits six such warnings).
 -/
 
 namespace Shevelev
