@@ -221,9 +221,25 @@ concrete instances `theorem1_H_exp`, `theorem1_K_exp` at $\omega = e^{2\pi i/n}$
 $\mu = e^{\pi i/n}$.  There are no auxiliary definitions: $H_s(m,n)$ and $K_s(m,n)$ appear
 directly as sums in the theorem statements.
 
+### Fast verification (recommended for first-time setup)
+
+Download the prebuilt Mathlib cache (~2 min), then typecheck:
+
 ```bash
-lake env lean Shevelev.lean   # fast typecheck
-lake build                    # full build
+python get_cache.py           # download cached Mathlib (~2 min)
+lake env lean Shevelev.lean   # typecheck only (~30 sec)
 ```
 
-Lean 4.30.0 / Mathlib v4.30.0. Compiles with no errors, warnings, or `sorry`.
+Exit code 0 = success. No errors, warnings, or `sorry`.
+
+### Full build (if cache unavailable)
+
+```bash
+lake build                    # rebuild all of Mathlib (~5–10 min first time)
+```
+
+Subsequent builds are incremental and fast.
+
+---
+
+**Verification status:** Lean 4.30.0 / Mathlib v4.30.0. Compiles cleanly.
