@@ -17,10 +17,9 @@ development — the difference systems and root-of-unity filters — is proved
 
 | File | Description |
 | --- | --- |
-| [`Proof/Shevelev.lean`](Proof/Shevelev.lean) | The formalization (the whole development lives here) |
+| [`Proof/Shevelev.lean`](Proof/Shevelev.lean) | The formalization (284 lines, focused on Theorem 1) |
 | [`Proof.lean`](Proof.lean) | Library root |
-| [`leanstral.py`](leanstral.py) | CLI wrapper around Mistral's Leanstral 1.5 for proof simplification |
-| [`get_cache.py`](get_cache.py) | Mathlib `.olean` cache downloader — a workaround for machines where `lake exe cache get` is blocked |
+| [`get_cache.py`](get_cache.py) | Mathlib cache helper (optional) |
 
 ## Building
 
@@ -43,41 +42,35 @@ but trust `lake build` for the final word.
 
 ## What is formalized
 
-The paper defines two families of difference analogs: `H_s(m,n)` and `K_s(m,n)`.
-Both are defined via the difference systems (Definitions 3–4) and satisfy three
-main theorems.
+**Theorem 1: Closed formulas (8) and (9)**
 
-**Index convention:** throughout, indices are shifted by one (`r = s - 1`), so the
-paper's `H_s(m,n)` is `H n (s-1) m` in Lean. Both families use a single definition
-`F n ε` with `ε ∈ {±1}` (`ε = 1` for `H`, `ε = -1` for `K`), since the paper
-observes that "the proofs for Theorem 2 are identical" for both.
+The paper's Theorem 1 states closed formulas for the difference analogs `H` and `K`.
+These are proved sorry-free using **root-of-unity filters**.
 
-| Paper | Lean |
-| --- | --- |
-| `H_s(m,n)`, `K_s(m,n)` — formulas (13), (14) | `H`, `K` (defined via `F`) |
-| Definitions 3, 4: `Δ y_s = y_{s-1}` | `F_succ` |
-| Definitions 3, 4: initial values | `F_zero_nat` |
-| Definitions 3, 4: `Δ y₁ = ±y_n` | `H_delta_one`, `K_delta_one` |
-| Extension (10) outside `s ∈ {1,…,n}` | `H_add_natCast`, `K_add_natCast` |
-| **Theorem 1**, formulas (8), (9) | `theorem1_H'`, `theorem1_K'` (any primitive root) and `theorem1_H_exp`, `theorem1_K_exp` (the paper's `ω = e^{2πi/n}`, `μ = e^{πi/n}`) |
+**Index convention:** indices shifted by one (`r = s - 1`):
+- Paper's `H_s(m,n)` = Lean's `H n (s-1) m`
+- Paper's `K_s(m,n)` = Lean's `K n (s-1) m`
 
-**Proof method:**
+**Core definitions:**
+- `mark ε q` : `±1`-valued exponential
+- `coef n ε r k` : coefficient extractor
+- `F n ε r m` : unified family for both H and K
+- `H n r m` : `F n 1 r m`
+- `K n r m` : `F n (-1) r m`
 
-* Theorem 1 uses the **root-of-unity filter** (`sum_zpow_eq` for `x^n = 1` and
-  `sum_zpow_odd` for `x^n = -1`) to extract closed formulas from the difference
-  systems.
+**Main theorems:**
+- `theorem1_H'`, `theorem1_K'` : general form (any primitive n-th root)
+- `theorem1_H_exp`, `theorem1_K_exp` : concrete form with `e^{2πi/n}`
 
-**Sanity checks** (proved by `decide`):
-
-* OEIS agreement: `H 3 0 5 = 11` matches [A024493](https://oeis.org/A024493);
-  `K 2 1` matches [A009545](https://oeis.org/A009545)
-* `H 2 0` is the hyperbolic cosine analog; `K 2 1` is the sine analog
+**Proof techniques:**
+- `sum_zpow_eq` : root-of-unity filter for `x^n = 1`
+- `sum_zpow_odd` : root-of-unity filter for `x^n = -1`
 
 **Out of scope:**
-
-* Theorems 2–3 (addition formulas and circulant determinants)
-* Definitions 1–2 (continuous functions of order `n`)
-* Closed forms for `K_i(m,5)` in terms of the golden ratio
+- Theorems 2–3 (not formalized)
+- Definitions 1–2 (continuous functions)
+- Difference systems proofs
+- Periodicity lemmas
 
 ## Verification
 
