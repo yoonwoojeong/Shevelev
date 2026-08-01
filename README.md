@@ -10,21 +10,37 @@
 
 **Main file:** [`Shevelev.lean`](Shevelev.lean) (121 lines, 5 theorems, sorry-free).
 
-### Clone & Build (fastest way — ~2.5 min)
+### ⚡ Fastest Way: Docker (instant, no setup)
+
+```bash
+docker run --rm -it ghcr.io/yoonwoojeong/shevelev:latest
+```
+
+Inside the container:
+```bash
+root@proof:/proof# lake env lean Shevelev.lean   # instant (everything cached)
+root@proof:/proof# cat README.md                  # full proof available
+root@proof:/proof# bash                           # explore interactively
+```
+
+**Why Docker:**
+- No installation needed
+- Mathlib pre-compiled (~1 GB cached image)
+- Verification instant (no 15–20 min wait)
+- Guaranteed reproducible environment
+
+### Local Build (slower first time, ~15–20 min)
+
+If you prefer local development:
 
 ```bash
 git clone https://github.com/yoonwoojeong/Shevelev.git
 cd Shevelev
-python get_cache.py           # download prebuilt Mathlib cache (~2 min)
-lake env lean Shevelev.lean   # typecheck the proof (~30 sec)
+python get_cache.py           # download Mathlib cache (~5–10 min)
+lake env lean Shevelev.lean   # typecheck proof (~5–10 min)
 ```
 
-If `get_cache.py` fails, fall back to:
-```bash
-lake build                    # rebuild Mathlib from scratch (~5–10 min)
-```
-
-**Success:** No errors, warnings, or `sorry` in output (exit code 0).
+**Success:** Exit code 0, no errors/warnings/sorries.
 
 ### Explore the Code
 
@@ -38,12 +54,14 @@ lake build                    # rebuild Mathlib from scratch (~5–10 min)
 ```
 .
 ├── Shevelev.lean           # Main proof (121 lines)
-├── README.md               # This file: math + Lean correspondence
 ├── Proof.lean              # Library root (imports Shevelev)
-├── get_cache.py            # Download prebuilt Mathlib (optional)
-├── lakefile.toml           # Build config
-├── lean-toolchain          # Lean version (4.30.0)
-└── lake-manifest.json      # Mathlib version (4.30.0)
+├── README.md               # This file: math + Lean correspondence
+├── CONTRIBUTING.md         # Developer guide
+├── Dockerfile              # Docker image recipe (pre-built Mathlib)
+├── get_cache.py            # Download Mathlib cache (local builds)
+├── lakefile.toml           # Lake build config
+├── lean-toolchain          # Lean 4.30.0
+└── lake-manifest.json      # Mathlib v4.30.0
 ```
 
 ---
@@ -265,25 +283,31 @@ concrete instances `theorem1_H_exp`, `theorem1_K_exp` at $\omega = e^{2\pi i/n}$
 $\mu = e^{\pi i/n}$.  There are no auxiliary definitions: $H_s(m,n)$ and $K_s(m,n)$ appear
 directly as sums in the theorem statements.
 
-### Fast verification (recommended for first-time setup)
+### Build Options
 
-Download the prebuilt Mathlib cache (~2 min), then typecheck:
-
-```bash
-python get_cache.py           # download cached Mathlib (~2 min)
-lake env lean Shevelev.lean   # typecheck only (~30 sec)
-```
-
-Exit code 0 = success. No errors, warnings, or `sorry`.
-
-### Full build (if cache unavailable)
+**Option 1: Docker (recommended — instant, no installation)**
 
 ```bash
-lake build                    # rebuild all of Mathlib (~5–10 min first time)
+docker run --rm -it ghcr.io/yoonwoojeong/shevelev:latest
 ```
 
-Subsequent builds are incremental and fast.
+Inside: `lake env lean Shevelev.lean` (instant, fully cached).
+
+**Option 2: Local with cache**
+
+```bash
+python get_cache.py           # download cached Mathlib (~5–10 min)
+lake env lean Shevelev.lean   # typecheck proof (~5–10 min)
+```
+
+**Option 3: Full local build (slowest)**
+
+```bash
+lake build                    # rebuild Mathlib from scratch (~20–30 min)
+```
 
 ---
 
 **Verification status:** Lean 4.30.0 / Mathlib v4.30.0. Compiles cleanly.
+
+**Docker image:** Automatically built and published by GitHub Actions on every commit to `master`. Pre-compiled Mathlib ensures instant verification.

@@ -30,19 +30,31 @@ Example: to understand **Formula (8)** (`theorem1_H`):
 
 ### Build and Verify Locally
 
-```bash
-# Fast path (recommended): download cache, then typecheck
-python get_cache.py
-lake env lean Shevelev.lean
+**Option 1: Docker (fastest, no installation)**
 
-# Output: (empty if successful, exit code 0)
-# If any errors/warnings appear, fix them and retry
+```bash
+# Build locally
+docker build -t shevelev:latest .
+
+# Run with cached Mathlib
+docker run --rm -it shevelev:latest
+root@proof:/proof# lake env lean Shevelev.lean  # instant
 ```
 
-**Slow path** (if cache download fails):
+**Option 2: Local with cache**
+
 ```bash
-lake build  # rebuilds Mathlib from scratch (~5–10 min)
+python get_cache.py           # ~5–10 min (one-time)
+lake env lean Shevelev.lean   # ~5–10 min first time, then cached
 ```
+
+**Option 3: Full local build**
+
+```bash
+lake build  # rebuilds Mathlib (~20–30 min first time)
+```
+
+**Output:** Exit code 0, empty diagnostics = success.
 
 ---
 
