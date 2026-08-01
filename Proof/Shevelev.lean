@@ -23,22 +23,19 @@ Indices are shifted by one (`r = s - 1`), which makes every statement cleaner:
 | extension (10)            | `F_add_natCast` : `F n ε (r+n) m = ε * F n ε r m`    |
 | systems (6),(7)           | `F_succ` : `F n ε r (m+1) = F n ε r m + F n ε (r-1) m` |
 | wrap-around `Δy₁ = ±yₙ`   | `H_delta_one` / `K_delta_one`                        |
-| Theorem 1, (8)/(9)        | `theorem1_H` / `theorem1_K` (any primitive root)     |
+| **Theorem 1**, (8)/(9)    | `theorem1_H` / `theorem1_K` (any primitive root)     |
 | (8)/(9) at the paper's roots | `theorem1_H_exp` / `theorem1_K_exp`               |
-| Theorem 2, (11)/(12)      | `theorem2_H` / `theorem2_K`                          |
-| Theorem 3, eigenvalue     | `altRowSum_H` / `altRowSum_K`                        |
-| Theorem 3, determinant    | `det_circulant_H` / `det_circulant_K`                |
 
 Formulas (13),(14) are taken as the *definition* of `H` and `K`; the fact that they
 solve the difference systems of Definitions 3 and 4 (which is the paper's Section 2
 opening remark, `Δ C(m,k) = C(m,k-1)`) is the lemma `F_succ` together with
 `F_zero_nat`. Everything is proved for a single family `F n ε` with `ε * ε = 1`,
-so `H` (`ε = 1`) and `K` (`ε = -1`) are handled at once — exactly the paper's
-observation that "the proofs for the formulas of Theorem 2 are identical".
+so `H` (`ε = 1`) and `K` (`ε = -1`) are handled at once.
 
-The core development compiles sorry-free with Lean 4.30.0 / Mathlib v4.30.0. The
-six `paper_*` bridge goals at the end restate the paper's exact printed formulas
-and are deliberately left as `sorry` (so `lake build` emits six such warnings).
+**Theorem 1** (the closed formulas via root-of-unity filters) is formalized
+sorry-free with Lean 4.30.0 / Mathlib v4.30.0. Two `paper_*` bridge goals at
+the end restate the paper's exact printed formulas (8) and (9) and are deliberately
+left as `sorry`.
 -/
 
 namespace Shevelev
