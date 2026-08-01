@@ -4,98 +4,228 @@
 
 ---
 
-## Definitions
+## 1. Definitions
 
-Let $\varepsilon \in \{-1, 1\}$ and define:
+We define the closed-form expressions for $H$ and $K$:
 
-$$\text{mark}(\varepsilon, q) := \begin{cases} 1 & \text{if } 2 \mid q \\ \varepsilon & \text{otherwise} \end{cases}$$
+$$H(n, r, m) := \sum_{k=0}^{m} \left[\,n \mid (k - r)\,\right] \binom{m}{k}$$
 
-Then for $n \in \mathbb{N}^+$, $r \in \mathbb{Z}$, $m \in \mathbb{N}$:
+$$K(n, r, m) := \sum_{k=0}^{m} \left[\,n \mid (k - r)\,\right] \cdot (-1)^{(k-r)/n} \binom{m}{k}$$
 
-$$H(n, r, m) := \sum_{k=0}^{m} \begin{cases} \binom{m}{k} & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
+where $[P]$ denotes the Iverson bracket (1 if $P$ is true, 0 otherwise).
 
-$$K(n, r, m) := \sum_{k=0}^{m} \begin{cases} (-1)^{(k-r)/n} \binom{m}{k} & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
-
-**Index Convention:** Paper's $H_s(m,n)$ $\leftrightarrow$ Lean's `H(n, s-1, m)`.
+**Index Convention:** Paper's $H_s(m,n)$ corresponds to Lean's `H(n, s-1, m)`.
 
 ---
 
-## Theorem 1: General Form with Primitive $n$-th Root
+## 2. Theorem 1: Closed Formula for $H$ with Primitive $n$-th Root
 
-**Statement:** Let $\zeta$ be a primitive $n$-th root of unity. Then:
-$$n \cdot H(n, r, m) = \sum_{j=0}^{n-1} (\zeta^j + 1)^m \cdot \zeta^{-jr}$$
+### Mathematical Statement
 
-**Proof (Equational Derivation):**
+Let $\zeta$ be a primitive $n$-th root of unity. Then:
 
-Starting from the definition of $H$:
-$$n \cdot H(n, r, m) = n \cdot \sum_{k=0}^{m} \begin{cases} \binom{m}{k} & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
+$$\boxed{n \cdot H(n, r, m) = \sum_{j=0}^{n-1} (\zeta^j + 1)^m \cdot \zeta^{-jr}}$$
 
-Expand $(\zeta^j + 1)^m$ using binomial theorem:
+### Proof: Step-by-Step Derivation
+
+**Step 1: Expand using Binomial Theorem**
+
 $$\sum_{j=0}^{n-1} (\zeta^j + 1)^m \cdot \zeta^{-jr} = \sum_{j=0}^{n-1} \left(\sum_{k=0}^{m} \binom{m}{k} \zeta^{jk}\right) \zeta^{-jr}$$
 
-Swap summation order (sum over $k$ first, then $j$):
+Lean code (in `calc` chain):
+```lean
+∑ j ∈ range n, (ζ ^ j + 1) ^ m * ζ ^ (-((j : ℤ) * r))
+  = ∑ j ∈ range n, ∑ k ∈ range (m + 1), (m.choose k : ℂ) * ζ ^ ((j : ℤ) * ((k : ℤ) - r))
+  := by
+    rw [add_pow, Finset.sum_mul]  -- expand (ζ^j + 1)^m using binomial theorem
+```
+
+**Step 2: Combine Exponents**
+
+$$= \sum_{j=0}^{n-1} \sum_{k=0}^{m} \binom{m}{k} \zeta^{j(k-r)}$$
+
+Lean code:
+```lean
+rw [show ζ ^ ((j : ℤ) * (k : ℤ)) * (m.choose k : ℂ) * ζ ^ (-((j : ℤ) * r))
+      = (m.choose k : ℂ) * (ζ ^ ((j : ℤ) * (k : ℤ)) * ζ ^ (-((j : ℤ) * r))) by ring]
+rw [← zpow_add₀ hζ0]  -- combine ζ^(jk) * ζ^(-jr) into ζ^(j(k-r))
+```
+
+**Step 3: Swap Summation Order**
+
 $$= \sum_{k=0}^{m} \binom{m}{k} \sum_{j=0}^{n-1} \zeta^{j(k-r)}$$
 
-Apply the **root-of-unity filter**: For any integer $a$,
+Lean code:
+```lean
+= ∑ k ∈ range (m + 1), ∑ j ∈ range n, (m.choose k : ℂ) * ζ ^ ((j : ℤ) * ((k : ℤ) - r))
+  := Finset.sum_comm  -- exchange order of summation
+```
+
+**Step 4: Apply Root-of-Unity Filter**
+
+The key lemma: For any integer $a$ and primitive $n$-th root $\zeta$:
+
 $$\sum_{j=0}^{n-1} \zeta^{ja} = \begin{cases} n & \text{if } n \mid a \\ 0 & \text{otherwise} \end{cases}$$
 
-Therefore, in the inner sum over $j$, only terms with $n \mid (k-r)$ survive:
-$$= \sum_{k=0}^{m} \begin{cases} \binom{m}{k} \cdot n & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
+Therefore:
 
-Factor out $n$:
-$$= n \cdot \sum_{k=0}^{m} \begin{cases} \binom{m}{k} & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
+$$= \sum_{k=0}^{m} \binom{m}{k} \cdot \begin{cases} n & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
 
-$$= n \cdot H(n, r, m) \quad \square$$
+Lean code:
+```lean
+= ∑ k ∈ range (m + 1), (m.choose k : ℂ) * (if (n : ℤ) ∣ ((k : ℤ) - r) then (n : ℂ) else 0)
+  := by
+    have key : ∑ j ∈ range n, ζ ^ ((j : ℤ) * a) = if (n : ℤ) ∣ a then (n : ℂ) else 0 := by
+      by_cases h : (n : ℤ) ∣ a
+      · simp [if_pos h, (hζ.zpow_eq_one_iff_dvd a).mpr h]  -- if n|a, sum = n
+      · have h1 : ζ ^ a ≠ 1 := fun hc => h ((hζ.zpow_eq_one_iff_dvd a).mp hc)
+        rw [geom_sum_eq h1, if_neg h]  -- if n∤a, use geometric series → 0
+    rw [← Finset.mul_sum, key]
+```
 
----
+**Step 5: Factor Out $n$ and Match Definition of $H$**
 
-## Theorem 2: General Form with Root Satisfying $\mu^n = -1$
+$$= n \cdot \sum_{k=0}^{m} \left[\,n \mid (k - r)\,\right] \binom{m}{k} = n \cdot H(n, r, m)$$
 
-**Statement:** Let $\mu \neq 0$ satisfy $\mu^n = -1$, and $\mu^2$ be a primitive $n$-th root of unity. Then:
-$$n \cdot K(n, r, m) = \sum_{j=0}^{n-1} (\mu^{2j+1} + 1)^m \cdot \mu^{-(2j+1)r}$$
-
-**Proof Sketch:**
-
-The proof parallels Theorem 1, with one key difference. Expand:
-$$\sum_{j=0}^{n-1} (\mu^{2j+1} + 1)^m \cdot \mu^{-(2j+1)r} = \sum_{j=0}^{n-1} \left(\sum_{k=0}^{m} \binom{m}{k} \mu^{jk(2j+1)}\right) \mu^{-(2j+1)r}$$
-
-Swap summation order:
-$$= \sum_{k=0}^{m} \binom{m}{k} \sum_{j=0}^{n-1} \mu^{(2j+1)(k-r)}$$
-
-The **odd-root filter** applies here: since $\mu^2$ is a primitive $n$-th root,
-$$\sum_{j=0}^{n-1} \mu^{(2j+1)a} = \begin{cases} n \cdot \text{mark}(-1, a/n) & \text{if } n \mid a \\ 0 & \text{otherwise} \end{cases}$$
-
-where $\text{mark}(-1, q) = (-1)^q$ for integer $q$.
-
-After applying the filter and factoring out $n$:
-$$= n \cdot \sum_{k=0}^{m} \begin{cases} (-1)^{(k-r)/n} \binom{m}{k} & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
-
-$$= n \cdot K(n, r, m) \quad \square$$
+Lean code:
+```lean
+= (n : ℂ) * (∑ k ∈ range (m + 1), (if (n : ℤ) ∣ ((k : ℤ) - r) then (m.choose k : ℤ) else 0))
+  := by rw [Finset.mul_sum]; split_ifs <;> ring
+```
 
 ---
 
-## Concrete Instantiations
+## 3. Theorem 2: Closed Formula for $K$ with Root $\mu^n = -1$
 
-**Theorem 3:** With $\zeta = e^{2\pi i/n}$:
-$$H(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{2\pi i j / n} + 1\right)^m \cdot e^{-2\pi i jr / n}$$
+### Mathematical Statement
 
-**Theorem 4:** With $\mu = e^{\pi i/n}$:
-$$K(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{\pi i (2j+1) / n} + 1\right)^m \cdot e^{-\pi i (2j+1)r / n}$$
+Let $\mu \neq 0$ satisfy $\mu^n = -1$, and $\mu^2$ be a primitive $n$-th root of unity. Then:
 
-Both follow by instantiating Theorems 1–2 with specific roots and dividing by $n$.
+$$\boxed{n \cdot K(n, r, m) = \sum_{j=0}^{n-1} (\mu^{2j+1} + 1)^m \cdot \mu^{-(2j+1)r}}$$
+
+### Proof Sketch
+
+The proof mirrors Theorem 1, with a modified filter:
+
+**Key Lemma:** For $\mu^2$ a primitive $n$-th root,
+$$\sum_{j=0}^{n-1} \mu^{(2j+1)a} = \begin{cases} n \cdot (-1)^{a/n} & \text{if } n \mid a \\ 0 & \text{otherwise} \end{cases}$$
+
+**Steps:**
+
+1. Expand $(\mu^{2j+1} + 1)^m$ using binomial theorem
+2. Combine exponents: $\mu^{(2j+1)k} \cdot \mu^{-(2j+1)r} = \mu^{(2j+1)(k-r)}$
+3. Swap summation order
+4. Apply the odd-root filter
+5. Factor out $n$ to obtain $K(n, r, m)$
+
+Lean implementation (in `theorem1_K`):
+```lean
+have key_odd : ∑ j ∈ range n, μ ^ ((2 * (j : ℤ) + 1) * a)
+    = if (n : ℤ) ∣ a then (n : ℂ) * (if Even (a / (n : ℤ)) then 1 else -1) else 0 := by
+  -- Split μ^(2j+1) into μ^1 · (μ^2)^j
+  have hsplit : ∀ j : ℕ, μ ^ ((2 * (j : ℤ) + 1) * a) = μ ^ a * (μ ^ 2) ^ ((j : ℤ) * a)
+  -- Apply even-root filter to (μ^2)^j, then account for μ^a = ±1 depending on parity
+  have key_even : ∑ j ∈ range n, (μ ^ 2) ^ ((j : ℤ) * a) = if (n : ℤ) ∣ a then (n : ℂ) else 0
+```
 
 ---
 
-## Lean Formalization
+## 4. Concrete Instantiations
 
-**File:** `Proof/Shevelev.lean` (167 lines)
+### Theorem 3: $H$ with Exponential Root
 
-The Lean code formalizes all four theorems using the same equational structure:
-- **Definitions inline:** $H$ and $K$ are expressed directly via summations with conditional terms
-- **Proofs use `calc` chains:** Each step corresponds to a mathematical equation transformation
-- **Filter lemmas embedded:** Root-of-unity filter logic is part of the proof, not separate auxiliary lemmas
+Set $\zeta = e^{2\pi i/n}$:
+
+$$H(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{2\pi i j/n} + 1\right)^m e^{-2\pi ijr/n}$$
+
+Lean code:
+```lean
+theorem theorem1_H_exp (n : ℕ) (hn : 0 < n) (r : ℤ) (m : ℕ) :
+    (∑ k ∈ range (m + 1), (if (n : ℤ) ∣ ((k : ℤ) - r) then (m.choose k : ℤ) else 0) : ℂ)
+      = (n : ℂ)⁻¹ * ∑ j ∈ range n, (exp (2 * Real.pi * I / n) ^ j + 1) ^ m *
+          exp (2 * Real.pi * I / n) ^ (-((j : ℤ) * r))
+```
+
+### Theorem 4: $K$ with Exponential Root
+
+Set $\mu = e^{\pi i/n}$:
+
+$$K(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{\pi i(2j+1)/n} + 1\right)^m e^{-\pi i(2j+1)r/n}$$
+
+Lean code:
+```lean
+theorem theorem1_K_exp (n : ℕ) (hn : 0 < n) (r : ℤ) (m : ℕ) :
+    (∑ k ∈ range (m + 1),
+      (if (n : ℤ) ∣ ((k : ℤ) - r) then (if Even (((k : ℤ) - r) / (n : ℤ)) then 1 else -1) else 0) * (m.choose k : ℤ) : ℂ)
+      = (n : ℂ)⁻¹ * ∑ j ∈ range n, (exp (Real.pi * I / n) ^ (2 * j + 1) + 1) ^ m *
+          exp (Real.pi * I / n) ^ (-((2 * (j : ℤ) + 1) * r))
+```
+
+---
+
+## 5. Lean Formalization Structure
+
+**File:** `Shevelev.lean` (151 lines)
+
+### Organization
+
+The file contains four theorems corresponding to the four results above:
+
+| Theorem | Math Concept | Lean Name | Lean LOC |
+|---------|--------------|-----------|---------|
+| Thm 1 | General $H$ formula | `theorem1_H` | ~40 |
+| Thm 2 | General $K$ formula | `theorem1_K` | ~70 |
+| Thm 3 | Concrete $H$ | `theorem1_H_exp` | ~8 |
+| Thm 4 | Concrete $K$ | `theorem1_K_exp` | ~13 |
+
+### Key Tactics Used
+
+- **`calc` chains:** Show step-by-step equality transformations, mirroring the mathematical proof
+- **`simp` + `ring`:** Simplify expressions and ring identities
+- **`by_cases`:** Branch on divisibility conditions
+- **`Finset.sum_comm`:** Formally swap summation order
+- **`zpow_add₀`, `zpow_mul`:** Combine and multiply complex power exponents
+
+### Correspondence Example
+
+**Math:** $\zeta^{jk} \cdot \zeta^{-jr} = \zeta^{j(k-r)}$
+
+**Lean:**
+```lean
+rw [show ζ ^ ((j : ℤ) * (k : ℤ)) * (m.choose k : ℂ) * ζ ^ (-((j : ℤ) * r))
+      = (m.choose k : ℂ) * (ζ ^ ((j : ℤ) * (k : ℤ)) * ζ ^ (-((j : ℤ) * r))) by ring]
+rw [← zpow_add₀ hζ0]
+congr 1; ring
+```
+
+---
+
+## 6. Build & Verify
+
+```bash
+# Compile main file
+lake env lean Shevelev.lean
+
+# Full build
+lake build
+```
 
 **Verification:** Lean 4.30.0 / Mathlib v4.30.0. All theorems compile without errors or warnings.
+
+---
+
+## 7. Repository Structure
+
+```
+Shevelev.lean      → Main formalization (151 lines, 4 theorems)
+Proof.lean         → Library root, imports Shevelev
+README.md          → This file
+lakefile.toml      → Build configuration
+lean-toolchain     → Lean version (4.30.0)
+lake-manifest.json → Mathlib version (4.30.0)
+aux/               → Auxiliary tools and reports
+.github/workflows/ → CI configuration
+```
 
 ---
 

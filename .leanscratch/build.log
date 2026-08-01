@@ -1,0 +1,12 @@
+⚠ [8475/8477] Built Proof.Shevelev (961s)
+warning: Proof/Shevelev.lean:670:8: declaration uses `sorry`
+warning: Proof/Shevelev.lean:676:8: declaration uses `sorry`
+warning: Proof/Shevelev.lean:679:100: This line exceeds the 100 character limit, please shorten it!
+
+Note: This linter can be disabled with `set_option linter.style.longLine false`
+warning: Proof/Shevelev.lean:682:8: declaration uses `sorry`
+warning: Proof/Shevelev.lean:688:8: declaration uses `sorry`
+warning: Proof/Shevelev.lean:694:8: declaration uses `sorry`
+warning: Proof/Shevelev.lean:698:8: declaration uses `sorry`
+✔ [8476/8477] Built Proof (83s)
+Build completed successfully (8477 jobs).
