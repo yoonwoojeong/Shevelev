@@ -6,73 +6,94 @@
 
 ## Definitions
 
-**Mark Function** ($\varepsilon \in \{-1, 1\}$, $q \in \mathbb{Z}$):
+Let $\varepsilon \in \{-1, 1\}$ and define:
+
 $$\text{mark}(\varepsilon, q) := \begin{cases} 1 & \text{if } 2 \mid q \\ \varepsilon & \text{otherwise} \end{cases}$$
 
-**Coefficient Extractor** ($n \in \mathbb{N}^+$, $\varepsilon \in \{-1, 1\}$, $r \in \mathbb{Z}$, $k \in \mathbb{N}$):
-$$\text{coef}(n, \varepsilon, r, k) := \begin{cases} \text{mark}\left(\varepsilon, \frac{k - r}{n}\right) & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
+Then for $n \in \mathbb{N}^+$, $r \in \mathbb{Z}$, $m \in \mathbb{N}$:
 
-**Unified Family** ($n \in \mathbb{N}^+$, $\varepsilon \in \{-1, 1\}$, $r \in \mathbb{Z}$, $m \in \mathbb{N}$):
-$$F(n, \varepsilon, r, m) := \sum_{k=0}^{m} \text{coef}(n, \varepsilon, r, k) \cdot \binom{m}{k}$$
+$$H(n, r, m) := \sum_{k=0}^{m} \begin{cases} \binom{m}{k} & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
 
-**Difference Analogs:**
-$$H(n, r, m) := F(n, 1, r, m), \quad K(n, r, m) := F(n, -1, r, m)$$
+$$K(n, r, m) := \sum_{k=0}^{m} \begin{cases} (-1)^{(k-r)/n} \binom{m}{k} & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
 
 **Index Convention:** Paper's $H_s(m,n)$ $\leftrightarrow$ Lean's `H(n, s-1, m)`.
 
 ---
 
-## Main Theorems
+## Theorem 1: General Form with Primitive $n$-th Root
 
-**Theorem 1** (General Form for $H$).  
-Let $\zeta$ be a primitive $n$-th root of unity. Then:
+**Statement:** Let $\zeta$ be a primitive $n$-th root of unity. Then:
 $$n \cdot H(n, r, m) = \sum_{j=0}^{n-1} (\zeta^j + 1)^m \cdot \zeta^{-jr}$$
 
-**Theorem 2** (General Form for $K$).  
-Let $\mu^n = -1$ with $\mu^2$ a primitive $n$-th root of unity. Then:
-$$n \cdot K(n, r, m) = \sum_{j=0}^{n-1} (\mu^{2j+1} + 1)^m \cdot \mu^{-(2j+1)r}$$
+**Proof (Equational Derivation):**
 
-**Theorem 3** (Concrete: $H$ with $\zeta = e^{2\pi i/n}$).
-$$H(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{2\pi i j / n} + 1\right)^m \cdot e^{-2\pi i jr / n}$$
+Starting from the definition of $H$:
+$$n \cdot H(n, r, m) = n \cdot \sum_{k=0}^{m} \begin{cases} \binom{m}{k} & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
 
-**Theorem 4** (Concrete: $K$ with $\mu = e^{\pi i/n}$).
-$$K(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{\pi i (2j+1) / n} + 1\right)^m \cdot e^{-\pi i (2j+1)r / n}$$
+Expand $(\zeta^j + 1)^m$ using binomial theorem:
+$$\sum_{j=0}^{n-1} (\zeta^j + 1)^m \cdot \zeta^{-jr} = \sum_{j=0}^{n-1} \left(\sum_{k=0}^{m} \binom{m}{k} \zeta^{jk}\right) \zeta^{-jr}$$
+
+Swap summation order (sum over $k$ first, then $j$):
+$$= \sum_{k=0}^{m} \binom{m}{k} \sum_{j=0}^{n-1} \zeta^{j(k-r)}$$
+
+Apply the **root-of-unity filter**: For any integer $a$,
+$$\sum_{j=0}^{n-1} \zeta^{ja} = \begin{cases} n & \text{if } n \mid a \\ 0 & \text{otherwise} \end{cases}$$
+
+Therefore, in the inner sum over $j$, only terms with $n \mid (k-r)$ survive:
+$$= \sum_{k=0}^{m} \begin{cases} \binom{m}{k} \cdot n & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
+
+Factor out $n$:
+$$= n \cdot \sum_{k=0}^{m} \begin{cases} \binom{m}{k} & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
+
+$$= n \cdot H(n, r, m) \quad \square$$
 
 ---
 
-## Lean Realization
+## Theorem 2: General Form with Root Satisfying $\mu^n = -1$
+
+**Statement:** Let $\mu \neq 0$ satisfy $\mu^n = -1$, and $\mu^2$ be a primitive $n$-th root of unity. Then:
+$$n \cdot K(n, r, m) = \sum_{j=0}^{n-1} (\mu^{2j+1} + 1)^m \cdot \mu^{-(2j+1)r}$$
+
+**Proof Sketch:**
+
+The proof parallels Theorem 1, with one key difference. Expand:
+$$\sum_{j=0}^{n-1} (\mu^{2j+1} + 1)^m \cdot \mu^{-(2j+1)r} = \sum_{j=0}^{n-1} \left(\sum_{k=0}^{m} \binom{m}{k} \mu^{jk(2j+1)}\right) \mu^{-(2j+1)r}$$
+
+Swap summation order:
+$$= \sum_{k=0}^{m} \binom{m}{k} \sum_{j=0}^{n-1} \mu^{(2j+1)(k-r)}$$
+
+The **odd-root filter** applies here: since $\mu^2$ is a primitive $n$-th root,
+$$\sum_{j=0}^{n-1} \mu^{(2j+1)a} = \begin{cases} n \cdot \text{mark}(-1, a/n) & \text{if } n \mid a \\ 0 & \text{otherwise} \end{cases}$$
+
+where $\text{mark}(-1, q) = (-1)^q$ for integer $q$.
+
+After applying the filter and factoring out $n$:
+$$= n \cdot \sum_{k=0}^{m} \begin{cases} (-1)^{(k-r)/n} \binom{m}{k} & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
+
+$$= n \cdot K(n, r, m) \quad \square$$
+
+---
+
+## Concrete Instantiations
+
+**Theorem 3:** With $\zeta = e^{2\pi i/n}$:
+$$H(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{2\pi i j / n} + 1\right)^m \cdot e^{-2\pi i jr / n}$$
+
+**Theorem 4:** With $\mu = e^{\pi i/n}$:
+$$K(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{\pi i (2j+1) / n} + 1\right)^m \cdot e^{-\pi i (2j+1)r / n}$$
+
+Both follow by instantiating Theorems 1–2 with specific roots and dividing by $n$.
+
+---
+
+## Lean Formalization
 
 **File:** `Proof/Shevelev.lean` (167 lines)
 
-### Proof Strategy
-
-All four theorems are proved **tactic-driven**. The key technique is the **root-of-unity filter**:
-
-$$\sum_{j=0}^{n-1} \zeta^{ja} = \begin{cases} n & \text{if } n \mid a \\ 0 & \text{otherwise} \end{cases}$$
-
-This is **embedded directly in the proof** using Lean tactics (`calc`, `simp`, `ring`, `by_cases`) rather than extracted as a separate lemma. The proof structure:
-
-1. **Expand binomials** using `add_pow` and `sum_mul`
-2. **Swap summation order** via `Finset.sum_comm`
-3. **Apply the filter** inline via case analysis on divisibility
-4. **Verify the result** matches the definition of $F$ using `ring` and `simp`
-
-### Code Structure
-
-```lean
--- 5 definitions (mark, coef, F, H, K)
-def mark (ε : ℤ) (q : ℤ) : ℤ := if Even q then 1 else ε
-def coef (n : ℕ) (ε : ℤ) (r : ℤ) (k : ℕ) : ℤ := ...
-def F (n : ℕ) (ε : ℤ) (r : ℤ) (m : ℕ) : ℤ := ...
-def H (n : ℕ) (r : ℤ) (m : ℕ) : ℤ := F n 1 r m
-def K (n : ℕ) (r : ℤ) (m : ℕ) : ℤ := F n (-1) r m
-
--- 4 theorems (general + concrete)
-theorem theorem1_H : ...
-theorem theorem1_K : ...
-theorem theorem1_H_exp : ...
-theorem theorem1_K_exp : ...
-```
+The Lean code formalizes all four theorems using the same equational structure:
+- **Definitions inline:** $H$ and $K$ are expressed directly via summations with conditional terms
+- **Proofs use `calc` chains:** Each step corresponds to a mathematical equation transformation
+- **Filter lemmas embedded:** Root-of-unity filter logic is part of the proof, not separate auxiliary lemmas
 
 **Verification:** Lean 4.30.0 / Mathlib v4.30.0. All theorems compile without errors or warnings.
 
