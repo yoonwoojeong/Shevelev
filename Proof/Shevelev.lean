@@ -220,7 +220,7 @@ theorem K_delta_one (n : ℕ) (hn : 0 < n) (m : ℕ) :
   rw [hper, sub_neg_eq_add]
   simpa [K] using F_succ n (-1) 0 m
 
-/-! ## 4. Theorem 1: the closed formulas (8) and (9)
+/-! ## 3. Theorem 1: the closed formulas (8) and (9)
 
 Formulas (18) and (19) of the paper are proved here by the root-of-unity filter,
 which is the content of `sum_zpow_eq` (for `x^n = 1`) and `sum_zpow_odd`
@@ -413,7 +413,7 @@ theorem theorem1_K_exp (n : ℕ) (hn : 0 < n) (r : ℤ) (m : ℕ) :
       show ((2 : ℕ) : ℂ) * (Real.pi * I / n) = 2 * Real.pi * I / n by push_cast; ring]
     exact Complex.isPrimitiveRoot_exp n hn.ne'
   exact theorem1_K' n hn (Complex.exp_ne_zero _) hμn hμ2 r m
-/-! ## 6. Sanity checks and the paper's examples
+/-! ## 4. Sanity checks and the paper's examples
 
 `H 3 0 5 = C(5,0) + C(5,3) = 11`, matching `H_1(m,3) = (2^m + 2 cos(πm/3))/3`
 (A024493); `K 2 1` is A009545, the difference analog of `sin`; `H 2 0` is the
@@ -425,7 +425,7 @@ example : (List.range 8).map (K 2 1) = [0, 1, 2, 2, 0, -4, -8, -8] := by decide
 
 example : (List.range 6).map (H 2 0) = [1, 1, 2, 4, 8, 16] := by decide
 
-/-! ## 6. Bridge goals: Theorem 1's formulas as direct consequences
+/-! ## 5. Bridge goals: Theorem 1's formulas as direct consequences
 
 Theorem 1 is formalized above under our index-shifted convention (r = s - 1).
 These bridge goals state the paper's formulas *exactly as printed*, with the
