@@ -42,10 +42,7 @@ namespace Shevelev
 
 open Finset
 
-/-! ## 1. A `±1`-valued exponential -/
 
-/-- `mark ε q` is `ε ^ q` when `ε = ±1`, defined for *all* integers `q`
-(the paper's `(-1)^t`, where `t` may be thought of as ranging over `ℤ`). -/
 def mark (ε : ℤ) (q : ℤ) : ℤ := if Even q then 1 else ε
 
 @[simp] lemma mark_zero (ε : ℤ) : mark ε 0 = 1 := by simp [mark]
@@ -75,24 +72,15 @@ lemma mark_sub_one {ε : ℤ} (hε : ε * ε = 1) (q : ℤ) : mark ε (q - 1) = 
   rw [hq] at h
   rw [h, ← mul_assoc, hε, one_mul]
 
-/-! ## 2. The difference analogs
 
-`F n ε r m = ∑_{t} ε^t * C(m, n*t + r)`, written as a sum over `k = n*t + r ≤ m`. -/
-
-/-- Coefficient of `C(m,k)` in `F n ε r m`: it is `ε ^ t` if `k = n * t + r`, else `0`. -/
 def coef (n : ℕ) (ε : ℤ) (r : ℤ) (k : ℕ) : ℤ :=
   if (n : ℤ) ∣ ((k : ℤ) - r) then mark ε (((k : ℤ) - r) / (n : ℤ)) else 0
--- Decidability of `(n : ℤ) ∣ ·` keeps `coef`, `F`, `H`, `K` computable, so the
--- sanity checks in §6 go through by `decide`.
 
-/-- The common generalization of formulas (13) and (14) of the paper. -/
 def F (n : ℕ) (ε : ℤ) (r : ℤ) (m : ℕ) : ℤ :=
   ∑ k ∈ range (m + 1), coef n ε r k * (m.choose k : ℤ)
 
-/-- Difference hyperbolic function of order `n`: `H n (s-1) m = H_s(m,n)`, formula (13). -/
 def H (n : ℕ) (r : ℤ) (m : ℕ) : ℤ := F n 1 r m
 
-/-- Difference trigonometric function of order `n`: `K n (s-1) m = K_s(m,n)`, formula (14). -/
 def K (n : ℕ) (r : ℤ) (m : ℕ) : ℤ := F n (-1) r m
 
 lemma H_eq (n : ℕ) (r : ℤ) (m : ℕ) :
@@ -410,18 +398,6 @@ theorem theorem1_K_exp (n : ℕ) (hn : 0 < n) (r : ℤ) (m : ℕ) :
       show ((2 : ℕ) : ℂ) * (Real.pi * I / n) = 2 * Real.pi * I / n by push_cast; ring]
     exact Complex.isPrimitiveRoot_exp n hn.ne'
   exact theorem1_K' n hn (Complex.exp_ne_zero _) hμn hμ2 r m
-/-! ## 4. Sanity checks and the paper's examples
-
-`H 3 0 5 = C(5,0) + C(5,3) = 11`, matching `H_1(m,3) = (2^m + 2 cos(πm/3))/3`
-(A024493); `K 2 1` is A009545, the difference analog of `sin`; `H 2 0` is the
-analog of `cosh`. Everything is computable, so the checks are by `decide`. -/
-
-example : H 3 0 5 = 11 ∧ H 3 1 5 = 10 ∧ H 3 2 5 = 11 := by decide
-
-example : (List.range 8).map (K 2 1) = [0, 1, 2, 2, 0, -4, -8, -8] := by decide
-
-example : (List.range 6).map (H 2 0) = [1, 1, 2, 4, 8, 16] := by decide
-
 /-! ## 5. Bridge goals: Theorem 1's formulas as direct consequences
 
 Theorem 1 is formalized above under our index-shifted convention (r = s - 1).
