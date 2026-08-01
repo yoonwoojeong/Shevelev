@@ -4,6 +4,50 @@
 
 ---
 
+## Quick Start
+
+**What is this?** A Lean 4 formalization of Theorem 1 from Shevelev's paper: closed-form formulas for two families of combinatorial sums, proved via root-of-unity filter techniques.
+
+**Main file:** [`Shevelev.lean`](Shevelev.lean) (121 lines, 5 theorems, sorry-free).
+
+### Clone & Build (fastest way — ~2.5 min)
+
+```bash
+git clone https://github.com/yoonwoojeong/Shevelev.git
+cd Shevelev
+python get_cache.py           # download prebuilt Mathlib cache (~2 min)
+lake env lean Shevelev.lean   # typecheck the proof (~30 sec)
+```
+
+If `get_cache.py` fails, fall back to:
+```bash
+lake build                    # rebuild Mathlib from scratch (~5–10 min)
+```
+
+**Success:** No errors, warnings, or `sorry` in output (exit code 0).
+
+### Explore the Code
+
+- **Read the formulas:** Start with §1–2 below (definitions and main theorems)
+- **See the proof structure:** §2–3 explain the equational derivation step-by-step
+- **Understand the Lean code:** §2–3 also show the exact Lean implementation for each step
+- **Check the implementation:** Open [`Shevelev.lean`](Shevelev.lean) and jump to line numbers in the README
+
+### File Organization
+
+```
+.
+├── Shevelev.lean           # Main proof (121 lines)
+├── README.md               # This file: math + Lean correspondence
+├── Proof.lean              # Library root (imports Shevelev)
+├── get_cache.py            # Download prebuilt Mathlib (optional)
+├── lakefile.toml           # Build config
+├── lean-toolchain          # Lean version (4.30.0)
+└── lake-manifest.json      # Mathlib version (4.30.0)
+```
+
+---
+
 ## 1. Definitions
 
 **Paper notation (original):** For $m, n, s \in \mathbb{N}^+$ with $s \geq 1$,
