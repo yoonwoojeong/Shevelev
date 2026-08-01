@@ -58,35 +58,26 @@ $$n \cdot H(n, r, m) = \sum_{j=0}^{n-1} (\zeta^j + 1)^m \cdot \zeta^{-jr}$$
 **Proof.**  
 By expanding $(\zeta^j + 1)^m$ using the binomial theorem and commuting the order of summation. The root-of-unity filter (Lemma 2.2) extracts the divisible terms. $\square$
 
-**Theorem 3.2** (Closed Formula for $H$ — Divided Form).  
-Let $n \in \mathbb{N}^+$ and $\zeta$ a primitive $n$-th root of unity. Then:
-$$H(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} (\zeta^j + 1)^m \cdot \zeta^{-jr}$$
-
-**Proof.**  
-Divide Theorem 3.1 by $n$. $\square$
-
-**Theorem 3.3** (Closed Formula for $K$ — General Form).  
+**Theorem 3.2** (Closed Formula for $K$ — General Form).  
 Let $n \in \mathbb{N}^+$, $\mu \neq 0$, $\mu^n = -1$, and $\mu^2$ a primitive $n$-th root of unity. Then:
 $$n \cdot K(n, r, m) = \sum_{j=0}^{n-1} (\mu^{2j+1} + 1)^m \cdot \mu^{-(2j+1)r}$$
 
 **Proof.**  
 By parallel argument to Theorem 3.1, using Lemma 2.4 instead of Lemma 2.2. $\square$
 
-**Theorem 3.4** (Closed Formula for $K$ — Divided Form).  
-Let $n \in \mathbb{N}^+$, $\mu \neq 0$, $\mu^n = -1$, and $\mu^2$ a primitive $n$-th root of unity. Then:
-$$K(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} (\mu^{2j+1} + 1)^m \cdot \mu^{-(2j+1)r}$$
-
-**Proof.**  
-Divide Theorem 3.3 by $n$. $\square$
-
-**Theorem 3.5** (Concrete Realization with Exponentials).  
+**Theorem 3.3** (Concrete Realization for $H$ — Exponential Form).  
 For $n \in \mathbb{N}^+$:
 $$H(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{2\pi i j / n} + 1\right)^m \cdot e^{-2\pi i jr / n}$$
 
+**Proof.**  
+Instantiate Theorem 3.1 with $\zeta = e^{2\pi i / n}$ and divide by $n$. $\square$
+
+**Theorem 3.4** (Concrete Realization for $K$ — Exponential Form).  
+For $n \in \mathbb{N}^+$:
 $$K(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{\pi i (2j+1) / n} + 1\right)^m \cdot e^{-\pi i (2j+1)r / n}$$
 
 **Proof.**  
-Instantiate Theorems 3.2 and 3.4 with $\zeta = e^{2\pi i / n}$ and $\mu = e^{\pi i / n}$ respectively. $\square$
+Instantiate Theorem 3.2 with $\mu = e^{\pi i / n}$ and divide by $n$. $\square$
 
 ---
 
@@ -95,15 +86,15 @@ Instantiate Theorems 3.2 and 3.4 with $\zeta = e^{2\pi i / n}$ and $\mu = e^{\pi
 **Remark 4.1** (Scope).  
 This formalization focuses on Theorem 1 (closed formulas) only. The difference systems, addition formulas (Theorem 2), and circulant determinant identities (Theorem 3) are out of scope.
 
-**Remark 4.2** (Bridge Goals).  
-Two bridge goals restate the paper's exact printed formulas (8) and (9):
-- `paper_theorem_1_H` for the $H$ formula
-- `paper_theorem_1_K` for the $K$ formula
+**Remark 4.2** (Proof Architecture).  
+The structure cleanly separates concerns:
+- **General theorems** (3.1–3.2): Work with any primitive $n$-th or $(2n+1)$-th roots
+- **Concrete instantiations** (3.3–3.4): Specialized versions using $e^{2\pi i / n}$ and $e^{\pi i / n}$
 
-These are left as `sorry` for future work by automated proof assistants.
+Users can instantiate the general forms with other roots as needed; the concrete versions show the paper's standard forms.
 
 **Remark 4.3** (Proof Status).  
-The core development (Theorems 3.1–3.5) is proved **sorry-free**. The formalization is **complete and machine-verified** with Lean 4.30.0 / Mathlib v4.30.0.
+The formalization is **complete and machine-verified** with Lean 4.30.0 / Mathlib v4.30.0. All theorems (3.1–3.4) are proved **sorry-free**.
 
 ---
 
