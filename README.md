@@ -30,75 +30,58 @@ Throughout, indices are shifted by one: $r = s - 1$. Thus:
 
 ---
 
-## 2. Auxiliary Lemmas
+## 2. Main Results
 
-**Lemma 2.1** (H as Divisor Sum).  
-$$H(n, r, m) = \sum_{k=0}^{m} \begin{cases} \binom{m}{k} & \text{if } n \mid (k - r) \\ 0 & \text{otherwise} \end{cases}$$
-
-**Lemma 2.2** (Root-of-Unity Filter for $n$-th Roots).  
-Let $n \in \mathbb{N}^+$ and $\zeta$ a primitive $n$-th root of unity. Then:
-$$\sum_{j=0}^{n-1} \zeta^{ja} = \begin{cases} n & \text{if } n \mid a \\ 0 & \text{otherwise} \end{cases}$$
-
-**Lemma 2.3** (Relation between $(-1)$ and Mark).  
-For all $t \in \mathbb{Z}$:
-$$(-1)^t = \text{mark}(-1, t)$$
-
-**Lemma 2.4** (Root-of-Unity Filter for Odd Roots).  
-Let $n \in \mathbb{N}^+$, $\mu$ such that $\mu^n = -1$ and $\mu^2$ is a primitive $n$-th root of unity. Then:
-$$\sum_{j=0}^{n-1} \mu^{(2j+1)a} = \begin{cases} n \cdot \text{mark}(-1, a/n) & \text{if } n \mid a \\ 0 & \text{otherwise} \end{cases}$$
-
----
-
-## 3. Main Results
-
-**Theorem 3.1** (Closed Formula for $H$ — General Form).  
+**Theorem 2.1** (Closed Formula for $H$ — General Form).  
 Let $n \in \mathbb{N}^+$ and $\zeta$ a primitive $n$-th root of unity. Then:
 $$n \cdot H(n, r, m) = \sum_{j=0}^{n-1} (\zeta^j + 1)^m \cdot \zeta^{-jr}$$
 
 **Proof.**  
-By expanding $(\zeta^j + 1)^m$ using the binomial theorem and commuting the order of summation. The root-of-unity filter (Lemma 2.2) extracts the divisible terms. $\square$
+Expand $(\zeta^j + 1)^m$ using binomial theorem, swap summation order, and apply the root-of-unity filter $\sum_{j=0}^{n-1} \zeta^{ja} = [n \mid a] \cdot n$ inline via tactics (`calc`, `split_ifs`, `ring`). $\square$
 
-**Theorem 3.2** (Closed Formula for $K$ — General Form).  
+**Theorem 2.2** (Closed Formula for $K$ — General Form).  
 Let $n \in \mathbb{N}^+$, $\mu \neq 0$, $\mu^n = -1$, and $\mu^2$ a primitive $n$-th root of unity. Then:
 $$n \cdot K(n, r, m) = \sum_{j=0}^{n-1} (\mu^{2j+1} + 1)^m \cdot \mu^{-(2j+1)r}$$
 
 **Proof.**  
-By parallel argument to Theorem 3.1, using Lemma 2.4 instead of Lemma 2.2. $\square$
+Parallel to Theorem 2.1: split $\mu^{2j+1}$ into factors, deploy the odd-root filter $\sum_{j=0}^{n-1} \mu^{(2j+1)a} = [n \mid a] \cdot n \cdot \text{mark}(-1, a/n)$ inline via nested case analysis on parity. $\square$
 
-**Theorem 3.3** (Concrete Realization for $H$ — Exponential Form).  
+**Theorem 2.3** (Concrete Realization for $H$ — Exponential Form).  
 For $n \in \mathbb{N}^+$:
 $$H(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{2\pi i j / n} + 1\right)^m \cdot e^{-2\pi i jr / n}$$
 
 **Proof.**  
-Instantiate Theorem 3.1 with $\zeta = e^{2\pi i / n}$ and divide by $n$. $\square$
+Instantiate Theorem 2.1 with $\zeta = e^{2\pi i / n}$ and divide by $n$. $\square$
 
-**Theorem 3.4** (Concrete Realization for $K$ — Exponential Form).  
+**Theorem 2.4** (Concrete Realization for $K$ — Exponential Form).  
 For $n \in \mathbb{N}^+$:
 $$K(n, r, m) = \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{\pi i (2j+1) / n} + 1\right)^m \cdot e^{-\pi i (2j+1)r / n}$$
 
 **Proof.**  
-Instantiate Theorem 3.2 with $\mu = e^{\pi i / n}$ and divide by $n$. $\square$
+Instantiate Theorem 2.2 with $\mu = e^{\pi i / n}$ and divide by $n$. $\square$
 
 ---
 
-## 4. Remarks
+## 3. Remarks
 
-**Remark 4.1** (Scope).  
+**Remark 3.1** (Scope).  
 This formalization focuses on Theorem 1 (closed formulas) only. The difference systems, addition formulas (Theorem 2), and circulant determinant identities (Theorem 3) are out of scope.
 
-**Remark 4.2** (Proof Architecture).  
-The structure cleanly separates concerns:
-- **General theorems** (3.1–3.2): Work with any primitive $n$-th or $(2n+1)$-th roots
-- **Concrete instantiations** (3.3–3.4): Specialized versions using $e^{2\pi i / n}$ and $e^{\pi i / n}$
+**Remark 3.2** (Proof Architecture & Tactics).  
+All proofs are **tactic-driven and inline filter logic**:
+- **Root-of-unity filters** are embedded directly in proof calculations via `calc` chains
+- **Binomial expansion, summation swaps, and divisibility checks** use `simp`, `ring`, `by_cases`
+- **No auxiliary lemmas**: proof structure flows directly from definitions to theorems
+- **General theorems** (2.1–2.2): work with any primitive $n$-th roots; concrete forms (2.3–2.4) specialize to $e^{2\pi i / n}$ and $e^{\pi i / n}$
 
-Users can instantiate the general forms with other roots as needed; the concrete versions show the paper's standard forms.
+Users can instantiate the general forms with other roots; concrete versions show the paper's standard formulation.
 
-**Remark 4.3** (Proof Status).  
-The formalization is **complete and machine-verified** with Lean 4.30.0 / Mathlib v4.30.0. All theorems (3.1–3.4) are proved **sorry-free**.
+**Remark 3.3** (Proof Status).  
+The formalization is **complete and machine-verified** with Lean 4.30.0 / Mathlib v4.30.0. All theorems (2.1–2.4) are proved **sorry-free**.
 
 ---
 
-## 5. Building and Verification
+## 4. Building and Verification
 
 ### Prerequisites
 - Lean 4.30.0 (via `lean-toolchain`)
@@ -118,35 +101,32 @@ lake env lean Proof/Shevelev.lean
 
 Successful build produces:
 ```
-warning: Proof/Shevelev.lean:253:8: declaration uses `sorry`
-warning: Proof/Shevelev.lean:259:8: declaration uses `sorry`
+✔ [8476/8477] Built Proof
 Build completed successfully (8477 jobs).
 ```
 
-The two warnings are the intentional bridge goals. All other declarations are proved.
+All theorems (2.1–2.4) compile without errors or warnings.
 
 ---
 
-## 6. Repository Structure
+## 5. Repository Structure
 
 ```
 Proof.lean              → Library root
-Proof/Shevelev.lean     → Main formalization (284 lines)
-  • Definitions 1.1–1.4
-  • Lemmas 2.1–2.4
-  • Theorems 3.1–3.5
-  • Bridge goals (Remark 4.2)
+Proof/Shevelev.lean     → Main formalization (167 lines, tactic-heavy)
+  • Definitions 1.1–1.4 (mark, coef, F, H, K)
+  • Theorems 2.1–2.4 (closed formulas + concrete instances)
+  • Inlined root-of-unity filters (no separate lemmas)
 
 lakefile.toml           → Build configuration
 lean-toolchain          → Lean version
 lean-manifest.json      → Mathlib version
 .github/workflows/      → CI configuration
-get_cache.py            → Optional Mathlib cache helper
 ```
 
 ---
 
-## 7. References
+## 6. References
 
 1. Shevelev, Vladimir. "Combinatorial identities generated by difference analogs of hyperbolic and trigonometric functions of order n." *arXiv preprint arXiv:1706.01454v4* (2017).
 
@@ -156,6 +136,6 @@ get_cache.py            → Optional Mathlib cache helper
 
 ---
 
-**Status:** ✓ Formalization complete and verified  
+**Status:** ✓ Formalization complete, verified, and tactic-driven  
 **Version:** Lean 4.30.0 / Mathlib 4.30.0  
 **Last Updated:** 2026-08-01
