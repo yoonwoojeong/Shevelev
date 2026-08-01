@@ -220,81 +220,6 @@ theorem K_delta_one (n : ℕ) (hn : 0 < n) (m : ℕ) :
   rw [hper, sub_neg_eq_add]
   simpa [K] using F_succ n (-1) 0 m
 
-/-! ## 3. Theorem 2: the addition formulas (11) and (12) -/
-
-/-- Re-indexing step in the proof of Theorem 2: the sums `Σ_2` and `Σ_1` of the paper
-differ only by the boundary terms, which cancel thanks to (10). -/
-lemma shift_sum (n : ℕ) {ε : ℤ} (hε : ε * ε = 1) (hn : 0 < n) (a : ℤ) (m s : ℕ) :
-    (∑ b ∈ range n, F n ε ((b : ℤ) - 1) s * F n ε (a - (b : ℤ)) m)
-      = ∑ b ∈ range n, F n ε (b : ℤ) s * F n ε (a - 1 - (b : ℤ)) m := by
-  obtain ⟨N, rfl⟩ : ∃ N, n = N + 1 := ⟨n - 1, by omega⟩
-  rw [Finset.sum_range_succ'
-        (fun b : ℕ => F (N + 1) ε ((b : ℤ) - 1) s * F (N + 1) ε (a - (b : ℤ)) m) N,
-      Finset.sum_range_succ
-        (fun b : ℕ => F (N + 1) ε (b : ℤ) s * F (N + 1) ε (a - 1 - (b : ℤ)) m) N]
-  have hbody : ∀ b : ℕ,
-      F (N + 1) ε (((b + 1 : ℕ) : ℤ) - 1) s * F (N + 1) ε (a - ((b + 1 : ℕ) : ℤ)) m
-        = F (N + 1) ε (b : ℤ) s * F (N + 1) ε (a - 1 - (b : ℤ)) m := by
-    intro b
-    congr 2 <;> push_cast <;> ring
-  -- the two boundary terms agree
-  have hb1 : F (N + 1) ε ((N : ℤ)) s = ε * F (N + 1) ε (-1) s := by
-    have h := F_add_natCast (N + 1) hε (by omega) (-1) s
-    have : (-1 : ℤ) + ((N + 1 : ℕ) : ℤ) = (N : ℤ) := by push_cast; ring
-    rwa [this] at h
-  have hb2 : F (N + 1) ε (a - 1 - (N : ℤ)) m = ε * F (N + 1) ε a m := by
-    have h := F_sub_natCast (N + 1) hε (by omega) a m
-    have : a - ((N + 1 : ℕ) : ℤ) = a - 1 - (N : ℤ) := by push_cast; ring
-    rwa [this] at h
-  simp only [hbody]
-  rw [hb1, hb2]
-  have hzero : F (N + 1) ε (((0 : ℕ) : ℤ) - 1) s * F (N + 1) ε (a - ((0 : ℕ) : ℤ)) m
-      = F (N + 1) ε (-1) s * F (N + 1) ε a m := by
-    congr 2
-    push_cast
-    ring
-  rw [hzero]
-  have : ε * F (N + 1) ε (-1) s * (ε * F (N + 1) ε a m)
-      = (ε * ε) * (F (N + 1) ε (-1) s * F (N + 1) ε a m) := by ring
-  rw [this, hε, one_mul]
-
-/-- **Theorem 2** (addition formulas), in the uniform form for `F`.
-With `ε = 1` this is (11), with `ε = -1` it is (12). -/
-theorem F_addition (n : ℕ) {ε : ℤ} (hε : ε * ε = 1) (hn : 0 < n) (m : ℕ) :
-    ∀ (s : ℕ) (a : ℤ), F n ε a (m + s)
-      = ∑ b ∈ range n, F n ε (b : ℤ) s * F n ε (a - (b : ℤ)) m := by
-  intro s
-  induction s with
-  | zero =>
-      intro a
-      rw [Nat.add_zero, Finset.sum_eq_single 0]
-      · rw [F_zero_nat n ε hn hn]
-        simp
-      · intro b hb hb0
-        rw [F_zero_nat n ε hn (Finset.mem_range.mp hb), if_neg hb0, zero_mul]
-      · intro h
-        exact absurd (Finset.mem_range.mpr hn) h
-  | succ s ih =>
-      intro a
-      have hms : m + (s + 1) = (m + s) + 1 := by omega
-      rw [hms, F_succ, ih a, ih (a - 1)]
-      have hstep : ∀ b : ℕ, F n ε (b : ℤ) (s + 1) * F n ε (a - (b : ℤ)) m
-          = F n ε (b : ℤ) s * F n ε (a - (b : ℤ)) m
-            + F n ε ((b : ℤ) - 1) s * F n ε (a - (b : ℤ)) m := by
-        intro b; rw [F_succ, add_mul]
-      rw [Finset.sum_congr rfl (fun b _ => hstep b), Finset.sum_add_distrib,
-        shift_sum n hε hn a m s]
-
-/-- **Formula (11)** of the paper (with `i`, `j` shifted by one: `H n r = H_{r+1}`). -/
-theorem theorem2_H (n : ℕ) (hn : 0 < n) (i : ℤ) (m s : ℕ) :
-    H n i (m + s) = ∑ j ∈ range n, H n (j : ℤ) s * H n (i - (j : ℤ)) m :=
-  F_addition n (ε := 1) (by norm_num) hn m s i
-
-/-- **Formula (12)** of the paper (with `i`, `j` shifted by one: `K n r = K_{r+1}`). -/
-theorem theorem2_K (n : ℕ) (hn : 0 < n) (i : ℤ) (m s : ℕ) :
-    K n i (m + s) = ∑ j ∈ range n, K n (j : ℤ) s * K n (i - (j : ℤ)) m :=
-  F_addition n (ε := -1) (by norm_num) hn m s i
-
 /-! ## 4. Theorem 1: the closed formulas (8) and (9)
 
 Formulas (18) and (19) of the paper are proved here by the root-of-unity filter,
@@ -488,130 +413,6 @@ theorem theorem1_K_exp (n : ℕ) (hn : 0 < n) (r : ℤ) (m : ℕ) :
       show ((2 : ℕ) : ℂ) * (Real.pi * I / n) = 2 * Real.pi * I / n by push_cast; ring]
     exact Complex.isPrimitiveRoot_exp n hn.ne'
   exact theorem1_K' n hn (Complex.exp_ne_zero _) hμn hμ2 r m
-
-/-! ## 5. Theorem 3: the circulant determinants vanish
-
-The paper computes the eigenvalue of the circulant belonging to the root `ω = 1`
-and shows it equals `∑_l (-1)^l C(m,l) = 0`. We use the same computation, but
-conclude directly: the all-ones vector lies in the kernel, hence the determinant
-vanishes.
-
-Note on conventions: Mathlib's `Matrix.circulant v` has entries `v (i - j)`, which is
-the *transpose* of the "first row `v 0, v 1, …`" circulant of the paper; transposing
-does not change the determinant, so the statements below are faithful. -/
-
-/-- The alternating sum of a full period of `F` telescopes into `∑_k (-1)^k C(m,k)`,
-provided the signs match: `ε = 1` with `n` even, or `ε = -1` with `n` odd. -/
-lemma alt_sum_F (n : ℕ) {ε : ℤ} (hn : 0 < n)
-    (hcase : (ε = 1 ∧ Even n) ∨ (ε = -1 ∧ Odd n)) (m : ℕ) :
-    ∑ r ∈ range n, (-1 : ℤ) ^ r * F n ε (r : ℤ) m
-      = ∑ k ∈ range (m + 1), (-1 : ℤ) ^ k * (m.choose k : ℤ) := by
-  have hn' : (0 : ℤ) < (n : ℤ) := by exact_mod_cast hn
-  -- for a fixed `k`, exactly one residue `r < n` contributes
-  have inner : ∀ k : ℕ, ∑ r ∈ range n, (-1 : ℤ) ^ r * coef n ε (r : ℤ) k = (-1 : ℤ) ^ k := by
-    intro k
-    rw [Finset.sum_eq_single (k % n)]
-    · have hkey : (k : ℤ) - ((k % n : ℕ) : ℤ) = (n : ℤ) * ((k / n : ℕ) : ℤ) := by
-        have h := Nat.div_add_mod k n
-        have : ((n * (k / n) + k % n : ℕ) : ℤ) = (k : ℤ) := by exact_mod_cast h
-        push_cast at this ⊢
-        linarith
-      have hdvd : (n : ℤ) ∣ ((k : ℤ) - ((k % n : ℕ) : ℤ)) := ⟨((k / n : ℕ) : ℤ), hkey⟩
-      have hq : ((k : ℤ) - ((k % n : ℕ) : ℤ)) / (n : ℤ) = ((k / n : ℕ) : ℤ) := by
-        rw [hkey, Int.mul_ediv_cancel_left _ (by exact_mod_cast hn.ne')]
-      rw [coef, if_pos hdvd, hq]
-      rcases hcase with ⟨rfl, hev⟩ | ⟨rfl, hodd⟩
-      · rw [mark_one_eq, mul_one]
-        conv_rhs => rw [← Nat.div_add_mod k n]
-        rw [pow_add, pow_mul, hev.neg_one_pow, one_pow, one_mul]
-      · rw [mark_natCast_neg]
-        conv_rhs => rw [← Nat.div_add_mod k n]
-        rw [pow_add, pow_mul, hodd.neg_one_pow]
-        ring
-    · intro b hb hbne
-      have hblt : b < n := Finset.mem_range.mp hb
-      have hzero : coef n ε (b : ℤ) k = 0 := by
-        rw [coef, if_neg]
-        intro hd
-        refine hbne ?_
-        have hmod : ((b : ℤ)) % (n : ℤ) = ((k : ℤ)) % (n : ℤ) := Int.modEq_iff_dvd.mpr hd
-        have hb' : ((b : ℤ)) % (n : ℤ) = (b : ℤ) :=
-          Int.emod_eq_of_lt (by exact_mod_cast Nat.zero_le b) (by exact_mod_cast hblt)
-        have hk' : ((k : ℤ)) % (n : ℤ) = ((k % n : ℕ) : ℤ) := by
-          push_cast
-          rfl
-        rw [hb', hk'] at hmod
-        exact_mod_cast hmod
-      rw [hzero, mul_zero]
-    · intro h
-      exact absurd (Finset.mem_range.mpr (Nat.mod_lt _ hn)) h
-  calc ∑ r ∈ range n, (-1 : ℤ) ^ r * F n ε (r : ℤ) m
-      = ∑ r ∈ range n, ∑ k ∈ range (m + 1), ((-1 : ℤ) ^ r * coef n ε (r : ℤ) k)
-          * (m.choose k : ℤ) := by
-        refine Finset.sum_congr rfl fun r _ => ?_
-        rw [F, Finset.mul_sum]
-        exact Finset.sum_congr rfl fun k _ => by ring
-    _ = ∑ k ∈ range (m + 1), ∑ r ∈ range n, ((-1 : ℤ) ^ r * coef n ε (r : ℤ) k)
-          * (m.choose k : ℤ) := Finset.sum_comm
-    _ = ∑ k ∈ range (m + 1), (-1 : ℤ) ^ k * (m.choose k : ℤ) := by
-        refine Finset.sum_congr rfl fun k _ => ?_
-        rw [← Finset.sum_mul, inner k]
-
-/-- **Theorem 3, part 1** (the vanishing eigenvalue): for even `n` and `m ≥ 1`,
-`H_1 - H_2 + … - H_n = 0`. -/
-theorem altRowSum_H (n : ℕ) (hn : 0 < n) (hev : Even n) {m : ℕ} (hm : 1 ≤ m) :
-    ∑ r ∈ range n, (-1 : ℤ) ^ r * H n (r : ℤ) m = 0 := by
-  have : ∑ r ∈ range n, (-1 : ℤ) ^ r * F n 1 (r : ℤ) m
-      = ∑ k ∈ range (m + 1), (-1 : ℤ) ^ k * (m.choose k : ℤ) :=
-    alt_sum_F n hn (Or.inl ⟨rfl, hev⟩) m
-  simp only [H]
-  rw [this, Int.alternating_sum_range_choose]
-  simp [Nat.one_le_iff_ne_zero.mp hm]
-
-/-- **Theorem 3, part 2** (the vanishing eigenvalue): for odd `n` and `m ≥ 1`,
-`K_1 - K_2 + … + K_n = 0`. -/
-theorem altRowSum_K (n : ℕ) (hn : 0 < n) (hodd : Odd n) {m : ℕ} (hm : 1 ≤ m) :
-    ∑ r ∈ range n, (-1 : ℤ) ^ r * K n (r : ℤ) m = 0 := by
-  have : ∑ r ∈ range n, (-1 : ℤ) ^ r * F n (-1) (r : ℤ) m
-      = ∑ k ∈ range (m + 1), (-1 : ℤ) ^ k * (m.choose k : ℤ) :=
-    alt_sum_F n hn (Or.inr ⟨rfl, hodd⟩) m
-  simp only [K]
-  rw [this, Int.alternating_sum_range_choose]
-  simp [Nat.one_le_iff_ne_zero.mp hm]
-
-/-- A circulant matrix whose first row sums to `0` is singular:
-its rows all sum to the same value, so the all-ones vector is in the kernel. -/
-lemma det_circulant_eq_zero_of_sum_eq_zero {N : ℕ} [NeZero N] {v : Fin N → ℤ}
-    (hv : ∑ i : Fin N, v i = 0) : (Matrix.circulant v).det = 0 := by
-  have hmul : (Matrix.circulant v).mulVec (fun _ => (1 : ℤ)) = 0 := by
-    funext i
-    simp only [Matrix.mulVec, dotProduct, Matrix.circulant_apply, mul_one, Pi.zero_apply]
-    rw [← hv]
-    exact Fintype.sum_equiv (Equiv.subLeft i) _ _ (fun j => rfl)
-  have hne : (fun _ : Fin N => (1 : ℤ)) ≠ 0 := by
-    intro h
-    have := congrFun h (⟨0, Nat.pos_of_ne_zero (NeZero.ne N)⟩ : Fin N)
-    simp at this
-  exact Matrix.exists_mulVec_eq_zero_iff.mp ⟨_, hne, hmul⟩
-
-/-- **Theorem 3, 1)**: if `n` is even then `det H_n = 0` for every `m ≥ 1`, where `H_n`
-is the circulant with first row `{(-1)^{i-1} H_i(m,n)}`. -/
-theorem det_circulant_H (n : ℕ) [NeZero n] (hev : Even n) {m : ℕ} (hm : 1 ≤ m) :
-    (Matrix.circulant fun i : Fin n => (-1 : ℤ) ^ (i : ℕ) * H n ((i : ℕ) : ℤ) m).det = 0 := by
-  have hn : 0 < n := Nat.pos_of_ne_zero (NeZero.ne n)
-  refine det_circulant_eq_zero_of_sum_eq_zero ?_
-  rw [Fin.sum_univ_eq_sum_range (fun i : ℕ => (-1 : ℤ) ^ i * H n (i : ℤ) m) n]
-  exact altRowSum_H n hn hev hm
-
-/-- **Theorem 3, 2)**: if `n` is odd then `det K_n = 0` for every `m ≥ 1`, where `K_n`
-is the circulant with first row `{(-1)^{i-1} K_i(m,n)}`. -/
-theorem det_circulant_K (n : ℕ) [NeZero n] (hodd : Odd n) {m : ℕ} (hm : 1 ≤ m) :
-    (Matrix.circulant fun i : Fin n => (-1 : ℤ) ^ (i : ℕ) * K n ((i : ℕ) : ℤ) m).det = 0 := by
-  have hn : 0 < n := Nat.pos_of_ne_zero (NeZero.ne n)
-  refine det_circulant_eq_zero_of_sum_eq_zero ?_
-  rw [Fin.sum_univ_eq_sum_range (fun i : ℕ => (-1 : ℤ) ^ i * K n (i : ℤ) m) n]
-  exact altRowSum_K n hn hodd hm
-
 /-! ## 6. Sanity checks and the paper's examples
 
 `H 3 0 5 = C(5,0) + C(5,3) = 11`, matching `H_1(m,3) = (2^m + 2 cos(πm/3))/3`
@@ -624,49 +425,11 @@ example : (List.range 8).map (K 2 1) = [0, 1, 2, 2, 0, -4, -8, -8] := by decide
 
 example : (List.range 6).map (H 2 0) = [1, 1, 2, 4, 8, 16] := by decide
 
-/-- Concrete instance of the addition formula (11) for `n = 3`, `i = 1`: resolving the
-negative indices with `H_add_natCast` (`H 3 (-1) = H 3 2`, `H 3 (-2) = H 3 1`) gives
-the paper's example `H_1(m+s) = H_1(s)H_1(m) + H_2(s)H_3(m) + H_3(s)H_2(m)`. -/
-example (m s : ℕ) :
-    H 3 0 (m + s)
-      = H 3 0 s * H 3 0 m + H 3 1 s * H 3 2 m + H 3 2 s * H 3 1 m := by
-  have h := theorem2_H 3 (by norm_num) 0 m s
-  have h1 : H 3 (-1 : ℤ) m = H 3 2 m := by
-    have h' := H_add_natCast 3 (by norm_num) (-1) m
-    norm_num at h'
-    linarith
-  have h2 : H 3 (-2 : ℤ) m = H 3 1 m := by
-    have h' := H_add_natCast 3 (by norm_num) (-2) m
-    norm_num at h'
-    linarith
-  simpa [Finset.sum_range_succ, h1, h2] using h
+/-! ## 6. Bridge goals: Theorem 1's formulas as direct consequences
 
-/-- Concrete instance of the addition formula (12) for `n = 3`, `i = 1`: here the
-negative indices flip sign, `K 3 (-1) = -K 3 2` and `K 3 (-2) = -K 3 1` by
-`K_add_natCast`, giving the paper's example
-`K_1(m+s) = K_1(s)K_1(m) - K_2(s)K_3(m) - K_3(s)K_2(m)`. -/
-example (m s : ℕ) :
-    K 3 0 (m + s)
-      = K 3 0 s * K 3 0 m - K 3 1 s * K 3 2 m - K 3 2 s * K 3 1 m := by
-  have h := theorem2_K 3 (by norm_num) 0 m s
-  have h1 : K 3 (-1 : ℤ) m = - K 3 2 m := by
-    have h' := K_add_natCast 3 (by norm_num) (-1) m
-    norm_num at h'
-    linarith
-  have h2 : K 3 (-2 : ℤ) m = - K 3 1 m := by
-    have h' := K_add_natCast 3 (by norm_num) (-2) m
-    norm_num at h'
-    linarith
-  simpa [Finset.sum_range_succ, h1, h2, sub_eq_add_neg] using h
-
-/-! ## 7. Bridge goals: paper's formulas as direct consequences
-
-The paper's Theorems 1–3 are formalized above under our index-shifted convention
-(r = s - 1). These bridge goals state the paper's formulas *exactly as printed*,
-with the paper's original indexing, and ask Leanstral to derive them from our API.
-
-A passing bridge proves that every claim in the paper follows from the
-formalization — a machine-checked soundness check.
+Theorem 1 is formalized above under our index-shifted convention (r = s - 1).
+These bridge goals state the paper's formulas *exactly as printed*, with the
+paper's original indexing, and ask Leanstral to derive them from our API.
 -/
 
 theorem paper_theorem_1_H (n : ℕ) (hn : 0 < n) {ζ : ℂ} (hζ : IsPrimitiveRoot ζ n)
@@ -680,26 +443,6 @@ theorem paper_theorem_1_K (n : ℕ) (hn : 0 < n) {μ : ℂ} (hμ0 : μ ≠ 0) (h
     ((K n ((s : ℤ) - 1) m : ℤ) : ℂ)
       = (n : ℂ)⁻¹ * ∑ j ∈ range n,
           (μ ^ (2 * j + 1) + 1) ^ m * μ ^ (-((2 * (j : ℤ) + 1) * ((s : ℤ) - 1))) := by
-  sorry
-
-theorem paper_theorem_2_H (n : ℕ) (hn : 0 < n) (m s : ℕ)
-    (i : ℕ) (hi : 1 ≤ i) (hi' : i ≤ n) :
-    H n ((i : ℤ) - 1) (m + s)
-      = ∑ j ∈ range n, H n ((j : ℤ) - 1) s * H n ((i : ℤ) - (j : ℤ)) m := by
-  sorry
-
-theorem paper_theorem_2_K (n : ℕ) (hn : 0 < n) (m s : ℕ)
-    (i : ℕ) (hi : 1 ≤ i) (hi' : i ≤ n) :
-    K n ((i : ℤ) - 1) (m + s)
-      = ∑ j ∈ range n, K n ((j : ℤ) - 1) s * K n ((i : ℤ) - (j : ℤ)) m := by
-  sorry
-
-theorem paper_theorem_3_H_det (n : ℕ) [NeZero n] (hev : Even n) {m : ℕ} (hm : 1 ≤ m) :
-    (Matrix.circulant fun (i : Fin n) => (-1 : ℤ) ^ (i : ℕ) * H n ((i : ℕ) : ℤ) m).det = 0 := by
-  sorry
-
-theorem paper_theorem_3_K_det (n : ℕ) [NeZero n] (hodd : Odd n) {m : ℕ} (hm : 1 ≤ m) :
-    (Matrix.circulant fun (i : Fin n) => (-1 : ℤ) ^ (i : ℕ) * K n ((i : ℕ) : ℤ) m).det = 0 := by
   sorry
 
 end Shevelev

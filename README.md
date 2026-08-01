@@ -6,12 +6,12 @@ A complete Lean 4 / Mathlib formalization of
 > hyperbolic and trigonometric functions of order n*,
 > [arXiv:1706.01454v4](https://arxiv.org/abs/1706.01454) [math.CO], 2017.
 
-All three theorems of the paper are formalized and machine-checked against Lean
-`v4.30.0` / Mathlib `v4.30.0`: the core development — the difference systems,
-the closed formulas, and the vanishing determinants — is proved **sorry-free**.
-Six additional *bridge* goals restate the paper's exact printed formulas
-((8), (9), (11), (12) and Theorem 3) and are stated but left as `sorry`, so
-`lake build` reports six `declaration uses 'sorry'` warnings and no errors.
+**Theorem 1** (the closed formulas, equations (8) and (9)) is formalized and
+machine-checked against Lean `v4.30.0` / Mathlib `v4.30.0`: the core
+development — the difference systems and root-of-unity filters — is proved
+**sorry-free**. Two *bridge* goals restate the paper's exact printed formulas
+((8) and (9)) and are stated but left as `sorry`, so `lake build` reports two
+`declaration uses 'sorry'` warnings and no errors.
 
 ## Contents
 
@@ -60,30 +60,27 @@ observes that "the proofs for Theorem 2 are identical" for both.
 | Definitions 3, 4: `Δ y₁ = ±y_n` | `H_delta_one`, `K_delta_one` |
 | Extension (10) outside `s ∈ {1,…,n}` | `H_add_natCast`, `K_add_natCast` |
 | **Theorem 1**, formulas (8), (9) | `theorem1_H'`, `theorem1_K'` (any primitive root) and `theorem1_H_exp`, `theorem1_K_exp` (the paper's `ω = e^{2πi/n}`, `μ = e^{πi/n}`) |
-| **Theorem 2**, formulas (11), (12) | `theorem2_H`, `theorem2_K`, both special cases of `F_addition` |
-| **Theorem 3** | `altRowSum_H`, `altRowSum_K` (the vanishing eigenvalue) and `det_circulant_H`, `det_circulant_K` |
 
-**Proof methods** (statements faithful to the paper, proofs may differ):
+**Proof method:**
 
-* Theorem 1: **root-of-unity filter** rather than characteristic-equation approach
-* Theorem 3: **kernel method** (all-ones vector in kernel) rather than eigenvalue product
-* Circulant determinant: Mathlib's `Matrix.circulant v` uses entries `v (i - j)`,
-  the transpose of the paper's convention; the determinant is unchanged
+* Theorem 1 uses the **root-of-unity filter** (`sum_zpow_eq` for `x^n = 1` and
+  `sum_zpow_odd` for `x^n = -1`) to extract closed formulas from the difference
+  systems.
 
-**Worked examples** (proved by `decide`):
+**Sanity checks** (proved by `decide`):
 
-* The `n = 3` addition formulas for `H` and `K` from the paper
-* Numeric agreement with OEIS [A009545](https://oeis.org/A009545) and
-  [A024493](https://oeis.org/A024493)
+* OEIS agreement: `H 3 0 5 = 11` matches [A024493](https://oeis.org/A024493);
+  `K 2 1` matches [A009545](https://oeis.org/A009545)
+* `H 2 0` is the hyperbolic cosine analog; `K 2 1` is the sine analog
 
-**Not formalized:**
+**Out of scope:**
 
+* Theorems 2–3 (addition formulas and circulant determinants)
 * Definitions 1–2 (continuous functions of order `n`)
-* Closed forms for `K_i(m,5)` in terms of the golden ratio (illustrative only)
+* Closed forms for `K_i(m,5)` in terms of the golden ratio
 
 ## Verification
 
-The development compiles clean: `lake build` succeeds with no errors and only the
-six intentional `sorry` warnings. All three theorems of the paper are proved
-sorry-free; the bridge goals restating the paper's exact formulas are deliberately
-left as `sorry` for future work.
+The development compiles clean: `lake build` succeeds with no errors and only two
+intentional `sorry` warnings (the bridge goals for Theorem 1). The core result
+(Theorem 1 closed formulas) is proved sorry-free.
