@@ -20,7 +20,6 @@ A Lean 4 / Mathlib formalization of
 formalized sorry-free with Lean 4.30.0 / Mathlib v4.30.0. Two bridge goals at
 the end restate the paper's exact printed formulas and are left as `sorry`.
 -/
-
 namespace Shevelev
 
 open Finset
