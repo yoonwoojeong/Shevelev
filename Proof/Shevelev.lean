@@ -146,13 +146,6 @@ theorem theorem1_H (n : ℕ) (hn : 0 < n) {ζ : ℂ} (hζ : IsPrimitiveRoot ζ n
         refine Finset.sum_congr rfl fun k _ => ?_
         split_ifs <;> ring
 
-/-- The divided form of formula (8), as printed in the paper. -/
-theorem theorem1_H' (n : ℕ) (hn : 0 < n) {ζ : ℂ} (hζ : IsPrimitiveRoot ζ n) (r : ℤ) (m : ℕ) :
-    ((H n r m : ℤ) : ℂ)
-      = (n : ℂ)⁻¹ * ∑ j ∈ range n, (ζ ^ j + 1) ^ m * ζ ^ (-((j : ℤ) * r)) := by
-  have hn0 : (n : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr hn.ne'
-  rw [← theorem1_H n hn hζ r m, ← mul_assoc, inv_mul_cancel₀ hn0, one_mul]
-
 /-- **Theorem 1, formula (9)** (paper's (19)), in the form without division.
 Here `μ` plays the role of `exp(πi/n)`: `μ^n = -1` and `μ^2` is a primitive `n`-th root
 of unity, so `{μ^{2j+1}}_{j<n}` are exactly the `n` roots of `x^n = -1`. -/
@@ -204,36 +197,28 @@ theorem theorem1_K (n : ℕ) (hn : 0 < n) {μ : ℂ} (hμ0 : μ ≠ 0) (hμn : �
         refine Finset.sum_congr rfl fun k _ => ?_
         split_ifs <;> ring
 
-/-- The divided form of formula (9), as printed in the paper. -/
-theorem theorem1_K' (n : ℕ) (hn : 0 < n) {μ : ℂ} (hμ0 : μ ≠ 0) (hμn : μ ^ n = -1)
-    (hμ2 : IsPrimitiveRoot (μ ^ 2) n) (r : ℤ) (m : ℕ) :
-    ((K n r m : ℤ) : ℂ)
-      = (n : ℂ)⁻¹ * ∑ j ∈ range n, (μ ^ (2 * j + 1) + 1) ^ m * μ ^ (-((2 * (j : ℤ) + 1) * r)) := by
-  have hn0 : (n : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr hn.ne'
-  rw [← theorem1_K n hn hμ0 hμn hμ2 r m, ← mul_assoc, inv_mul_cancel₀ hn0, one_mul]
-
 /-! ### The paper's concrete roots
 
 Formulas (8) and (9) exactly as printed, with `ω = exp(2πi/n)` and `μ = exp(πi/n)`. -/
 
 open Complex in
-/-- **Formula (8)** with the paper's `ω = exp(2πi/n)`. -/
+/-- **Formula (8)** — closed form with `ω = exp(2πi/n)`. -/
 theorem theorem1_H_exp (n : ℕ) (hn : 0 < n) (r : ℤ) (m : ℕ) :
     ((H n r m : ℤ) : ℂ)
       = (n : ℂ)⁻¹ * ∑ j ∈ range n,
           (exp (2 * Real.pi * I / n) ^ j + 1) ^ m
-            * exp (2 * Real.pi * I / n) ^ (-((j : ℤ) * r)) :=
-  theorem1_H' n hn (Complex.isPrimitiveRoot_exp n hn.ne') r m
+            * exp (2 * Real.pi * I / n) ^ (-((j : ℤ) * r)) := by
+  have hn0 : (n : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr hn.ne'
+  rw [← theorem1_H n hn (Complex.isPrimitiveRoot_exp n hn.ne') r m, ← mul_assoc, inv_mul_cancel₀ hn0, one_mul]
 
 open Complex in
-/-- **Formula (9)** with the paper's `μ = exp(πi/n)`: indeed `μ ≠ 0`, `μ ^ n = -1`, and
-`μ ^ 2 = exp(2πi/n)` is a primitive `n`-th root of unity, so `theorem1_K'` applies. -/
+/-- **Formula (9)** — closed form with `μ = exp(πi/n)`. -/
 theorem theorem1_K_exp (n : ℕ) (hn : 0 < n) (r : ℤ) (m : ℕ) :
     ((K n r m : ℤ) : ℂ)
       = (n : ℂ)⁻¹ * ∑ j ∈ range n,
           (exp (Real.pi * I / n) ^ (2 * j + 1) + 1) ^ m
             * exp (Real.pi * I / n) ^ (-((2 * (j : ℤ) + 1) * r)) := by
-  have hn' : (n : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr hn.ne'
+  have hn0 : (n : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr hn.ne'
   have hμn : exp (Real.pi * I / n) ^ n = -1 := by
     rw [← Complex.exp_nat_mul,
       show (n : ℂ) * (Real.pi * I / n) = Real.pi * I by field_simp,
@@ -242,25 +227,7 @@ theorem theorem1_K_exp (n : ℕ) (hn : 0 < n) (r : ℤ) (m : ℕ) :
     rw [← Complex.exp_nat_mul,
       show ((2 : ℕ) : ℂ) * (Real.pi * I / n) = 2 * Real.pi * I / n by push_cast; ring]
     exact Complex.isPrimitiveRoot_exp n hn.ne'
-  exact theorem1_K' n hn (Complex.exp_ne_zero _) hμn hμ2 r m
-/-! ## 5. Bridge goals: Theorem 1's formulas as direct consequences
-
-Theorem 1 is formalized above under our index-shifted convention (r = s - 1).
-These bridge goals state the paper's formulas *exactly as printed*, with the
-paper's original indexing, and ask Leanstral to derive them from our API.
--/
-
-theorem paper_theorem_1_H (n : ℕ) (hn : 0 < n) {ζ : ℂ} (hζ : IsPrimitiveRoot ζ n)
-    (m : ℕ) (s : ℕ) (hs : 1 ≤ s) (hs' : s ≤ n) :
-    ((H n ((s : ℤ) - 1) m : ℤ) : ℂ)
-      = (n : ℂ)⁻¹ * ∑ j ∈ range n, (ζ ^ j + 1) ^ m * ζ ^ (-((j : ℤ) * ((s : ℤ) - 1))) := by
-  sorry
-
-theorem paper_theorem_1_K (n : ℕ) (hn : 0 < n) {μ : ℂ} (hμ0 : μ ≠ 0) (hμn : μ ^ n = -1)
-    (hμ2 : IsPrimitiveRoot (μ ^ 2) n) (m : ℕ) (s : ℕ) (hs : 1 ≤ s) (hs' : s ≤ n) :
-    ((K n ((s : ℤ) - 1) m : ℤ) : ℂ)
-      = (n : ℂ)⁻¹ * ∑ j ∈ range n,
-          (μ ^ (2 * j + 1) + 1) ^ m * μ ^ (-((2 * (j : ℤ) + 1) * ((s : ℤ) - 1))) := by
-  sorry
+  have key := theorem1_K n hn (Complex.exp_ne_zero _) hμn hμ2 r m
+  rw [← key, ← mul_assoc, inv_mul_cancel₀ hn0, one_mul]
 
 end Shevelev
