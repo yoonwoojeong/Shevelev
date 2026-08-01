@@ -6,21 +6,29 @@
 
 ## 1. Definitions
 
-For $n \in \mathbb{N}^+$, $r \in \mathbb{Z}$, $m \in \mathbb{N}$, define:
+**Paper notation (original):** For $m, n, s \in \mathbb{N}^+$ with $s \geq 1$,
+
+$$H_s(m, n) \ :=\ \sum_{\substack{k=0 \\ n \mid (k-s+1)}}^{m} \binom{m}{k}$$
+
+$$K_s(m, n) \ :=\ \sum_{\substack{k=0 \\ n \mid (k-s+1)}}^{m} (-1)^{(k-s+1)/n} \binom{m}{k}$$
+
+**Lean implementation:** Set $r := s - 1$. Then:
 
 $$H(n, r, m) \ :=\ \sum_{\substack{k=0 \\ n \mid (k-r)}}^{m} \binom{m}{k}$$
 
 $$K(n, r, m) \ :=\ \sum_{\substack{k=0 \\ n \mid (k-r)}}^{m} (-1)^{(k-r)/n} \binom{m}{k}$$
 
-where the exponent $(k-r)/n$ is an integer whenever $n \mid (k-r)$.
-
-> **Index convention.** The paper writes $H_s(m,n)$; here that is $H(n,\, s-1,\, m)$.
+where $(k-r)/n$ denotes integer division (guaranteed to be exact when $n \mid (k-r)$).
 
 ---
 
-## 2. Main Theorem: Closed Formula for $H$
+## 2. Theorem 1 (Formula 8): Closed Formula for $H_s(m,n)$
 
-**Theorem.** Let $\zeta$ be a primitive $n$-th root of unity. Then
+**Statement.** Let $n \in \mathbb{N}^+$, $\zeta$ a primitive $n$-th root of unity, and $m, s \in \mathbb{N}$. Then
+
+$$n \cdot H_s(m, n) \ =\ \sum_{j=0}^{n-1} (\zeta^j + 1)^m \cdot \zeta^{-j(s-1)}.$$
+
+*In Lean variables* (with $r = s - 1$):
 
 $$n \cdot H(n, r, m) \ =\ \sum_{j=0}^{n-1} (\zeta^j + 1)^m \cdot \zeta^{-jr}.$$
 
@@ -119,9 +127,13 @@ $$\sum_k \tbinom{m}{k} \cdot [n \mid (k-r)] \cdot n \ =\ n \cdot H(n,r,m)$$
 
 ---
 
-## 3. Main Theorem: Closed Formula for $K$
+## 3. Theorem 1 (Formula 9): Closed Formula for $K_s(m,n)$
 
-**Theorem.** Let $\mu \neq 0$ satisfy $\mu^n = -1$, and $\mu^2$ a primitive $n$-th root of unity. Then
+**Statement.** Let $n \in \mathbb{N}^+$, $\mu \neq 0$ satisfy $\mu^n = -1$, with $\mu^2$ a primitive $n$-th root of unity. Then
+
+$$n \cdot K_s(m, n) \ =\ \sum_{j=0}^{n-1} (\mu^{2j+1} + 1)^m \cdot \mu^{-(2j+1)(s-1)}.$$
+
+*In Lean variables* (with $r = s - 1$):
 
 $$n \cdot K(n, r, m) \ =\ \sum_{j=0}^{n-1} (\mu^{2j+1} + 1)^m \cdot \mu^{-(2j+1)r}.$$
 
@@ -173,15 +185,15 @@ Here `if Even (a / n) then 1 else -1` is exactly $(-1)^{a/n}$, branching on pari
 
 ## 4. Concrete Instantiations
 
-**Theorem 3.** Set $\zeta = e^{2\pi i/n}$. Then
+**Corollary (Formula 8 — Exponential Form):** Set $\zeta = e^{2\pi i/n}$. Then
 
-$$H(n, r, m) \ =\ \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{2\pi i j/n} + 1\right)^m e^{-2\pi ijr/n}.$$
+$$H_s(m, n) \ =\ \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{2\pi i j/n} + 1\right)^m e^{-2\pi ij(s-1)/n}.$$
 
-**Theorem 4.** Set $\mu = e^{\pi i/n}$, so $\mu^n = e^{\pi i} = -1$. Then
+**Corollary (Formula 9 — Exponential Form):** Set $\mu = e^{\pi i/n}$ (so $\mu^n = -1$). Then
 
-$$K(n, r, m) \ =\ \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{\pi i(2j+1)/n} + 1\right)^m e^{-\pi i(2j+1)r/n}.$$
+$$K_s(m, n) \ =\ \frac{1}{n} \sum_{j=0}^{n-1} \left(e^{\pi i(2j+1)/n} + 1\right)^m e^{-\pi i(2j+1)(s-1)/n}.$$
 
-Both follow by instantiating Theorems 1–2 with the respective roots and dividing by $n$.
+Both are immediate consequences of Theorems 1–2 by substituting the specified roots and dividing by $n$.
 
 ---
 

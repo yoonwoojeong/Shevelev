@@ -18,16 +18,23 @@ namespace Shevelev
 
 open Finset
 
-/-- **Theorem 1, formula (8)**: Closed formula for H via root-of-unity filter.
+-- Root-of-unity filter: ∑_j ζ^(ja) = n if n|a, else 0
+-- This is the key mathematical lemma underlying both theorems.
 
-$H(n, r, m) := \sum_{k=0}^{m} [n \mid (k - r)] \binom{m}{k}$
+/-- **Theorem 1, formula (8)**: Closed formula for $H_s(m,n)$ via root-of-unity filter.
 
-where $[P]$ is 1 if P holds, 0 otherwise.
+Paper notation: $H_s(m, n) := \sum_{k=0}^{m} [n \mid (k - s + 1)] \binom{m}{k}$
+
+Lean: $s = r + 1$, so $H(n, r, m) = \sum_{k=0}^{m} [n \mid (k - r)] \binom{m}{k}$
 -/
+
 theorem theorem1_H (n : ℕ) (hn : 0 < n) {ζ : ℂ} (hζ : IsPrimitiveRoot ζ n) (r : ℤ) (m : ℕ) :
     (n : ℂ) * (∑ k ∈ range (m + 1), (if (n : ℤ) ∣ ((k : ℤ) - r) then (m.choose k : ℤ) else 0) : ℂ)
       = ∑ j ∈ range n, (ζ ^ j + 1) ^ m * ζ ^ (-((j : ℤ) * r)) := by
+
   have hζ0 : ζ ≠ 0 := hζ.ne_zero hn.ne'
+
+  -- Root-of-unity filter lemma
   have key : ∑ j ∈ range n, ζ ^ ((j : ℤ) * a) = if (n : ℤ) ∣ a then (n : ℂ) else 0 := by
     have hx : ∀ j : ℕ, ζ ^ ((j : ℤ) * a) = (ζ ^ a) ^ j := fun j => by
       rw [mul_comm, zpow_mul, ← zpow_natCast (ζ ^ a) j]
@@ -39,6 +46,8 @@ theorem theorem1_H (n : ℕ) (hn : 0 < n) {ζ : ℂ} (hζ : IsPrimitiveRoot ζ n
         rw [← zpow_natCast (ζ ^ a) n, ← zpow_mul, mul_comm, zpow_mul,
           zpow_natCast, hζ.pow_eq_one, one_zpow]
       rw [geom_sum_eq h1, h2, sub_self, zero_div, if_neg h]
+
+  -- Equational derivation
   calc ∑ j ∈ range n, (ζ ^ j + 1) ^ m * ζ ^ (-((j : ℤ) * r))
       = ∑ j ∈ range n, ∑ k ∈ range (m + 1), (m.choose k : ℂ) * ζ ^ ((j : ℤ) * ((k : ℤ) - r)) := by
         refine Finset.sum_congr rfl fun j _ => ?_
@@ -49,8 +58,10 @@ theorem theorem1_H (n : ℕ) (hn : 0 < n) {ζ : ℂ} (hζ : IsPrimitiveRoot ζ n
                 = (m.choose k : ℂ) * (ζ ^ ((j : ℤ) * (k : ℤ)) * ζ ^ (-((j : ℤ) * r))) by ring,
             ← zpow_add₀ hζ0]
           congr 1; ring
+
     _ = ∑ k ∈ range (m + 1), ∑ j ∈ range n, (m.choose k : ℂ) * ζ ^ ((j : ℤ) * ((k : ℤ) - r)) :=
         Finset.sum_comm
+
     _ = ∑ k ∈ range (m + 1), (m.choose k : ℂ) * (if (n : ℤ) ∣ ((k : ℤ) - r) then (n : ℂ) else 0) := by
         refine Finset.sum_congr rfl fun k _ => by
           rw [← Finset.mul_sum, key]
@@ -58,15 +69,24 @@ theorem theorem1_H (n : ℕ) (hn : 0 < n) {ζ : ℂ} (hζ : IsPrimitiveRoot ζ n
         rw [Finset.mul_sum]
         refine Finset.sum_congr rfl fun k _ => by split_ifs <;> ring
 
-/-- **Theorem 1, formula (9)**: Closed formula for K via root-of-unity filter for odd roots.
+---
 
-$K(n, r, m) := \sum_{k=0}^{m} [n \mid (k - r)] \cdot (-1)^{(k-r)/n} \binom{m}{k}$
+/-- **Theorem 1, formula (9)**: Closed formula for $K_s(m,n)$ via root-of-unity filter for odd roots.
+
+Paper notation: $K_s(m, n) := \sum_{k=0}^{m} [n \mid (k - s + 1)] \cdot (-1)^{(k-s+1)/n} \binom{m}{k}$
+
+Lean: $s = r + 1$, so $K(n, r, m) = \sum_{k=0}^{m} [n \mid (k - r)] \cdot (-1)^{(k-r)/n} \binom{m}{k}$
+
+Requires $\mu^n = -1$ with $\mu^2$ a primitive $n$-th root of unity.
 -/
+
 theorem theorem1_K (n : ℕ) (hn : 0 < n) {μ : ℂ} (hμ0 : μ ≠ 0) (hμn : μ ^ n = -1)
     (hμ2 : IsPrimitiveRoot (μ ^ 2) n) (r : ℤ) (m : ℕ) :
     (n : ℂ) * (∑ k ∈ range (m + 1),
       (if (n : ℤ) ∣ ((k : ℤ) - r) then (if Even (((k : ℤ) - r) / (n : ℤ)) then 1 else -1) else 0) * (m.choose k : ℤ) : ℂ)
       = ∑ j ∈ range n, (μ ^ (2 * j + 1) + 1) ^ m * μ ^ (-((2 * (j : ℤ) + 1) * r)) := by
+
+  -- Odd-root filter: ∑_j μ^((2j+1)a) = n·(-1)^(a/n) if n|a, else 0
   have key_odd : ∑ j ∈ range n, μ ^ ((2 * (j : ℤ) + 1) * a)
       = if (n : ℤ) ∣ a then (n : ℂ) * (if Even (a / (n : ℤ)) then 1 else -1) else 0 := by
     have hsplit : ∀ j : ℕ, μ ^ ((2 * (j : ℤ) + 1) * a) = μ ^ a * (μ ^ 2) ^ ((j : ℤ) * a) := by
@@ -76,6 +96,7 @@ theorem theorem1_K (n : ℕ) (hn : 0 < n) {μ : ℂ} (hμ0 : μ ≠ 0) (hμn : �
       have hx : ∀ j : ℕ, (μ ^ 2) ^ ((j : ℤ) * a) = ((μ ^ 2) ^ a) ^ j := fun j => by
         rw [mul_comm, zpow_mul, ← zpow_natCast ((μ ^ 2) ^ a) j]
       simp only [hx]
+
       by_cases h : (n : ℤ) ∣ a
       · simp [if_pos h, (hμ2.zpow_eq_one_iff_dvd a).mpr h]
       · have h1 : (μ ^ 2) ^ a ≠ 1 := fun hc => h ((hμ2.zpow_eq_one_iff_dvd a).mp hc)
@@ -98,6 +119,8 @@ theorem theorem1_K (n : ℕ) (hn : 0 < n) {μ : ℂ} (hμ0 : μ ≠ 0) (hμn : �
           simpa [this, ho.neg_one_zpow]]
       ring
     · simp [if_neg h]
+
+  -- Equational derivation (parallel to theorem1_H)
   calc ∑ j ∈ range n, (μ ^ (2 * j + 1) + 1) ^ m * μ ^ (-((2 * (j : ℤ) + 1) * r))
       = ∑ j ∈ range n, ∑ k ∈ range (m + 1), (m.choose k : ℂ) * μ ^ ((2 * (j : ℤ) + 1) * ((k : ℤ) - r)) := by
         refine Finset.sum_congr rfl fun j _ => ?_
@@ -108,8 +131,10 @@ theorem theorem1_K (n : ℕ) (hn : 0 < n) {μ : ℂ} (hμ0 : μ ≠ 0) (hμn : �
                 = (m.choose k : ℂ) * (μ ^ ((2 * (j : ℤ) + 1) * (k : ℤ)) * μ ^ (-((2 * (j : ℤ) + 1) * r))) by ring,
             ← zpow_add₀ hμ0]
           congr 1; ring
+
     _ = ∑ k ∈ range (m + 1), ∑ j ∈ range n, (m.choose k : ℂ) * μ ^ ((2 * (j : ℤ) + 1) * ((k : ℤ) - r)) :=
         Finset.sum_comm
+
     _ = ∑ k ∈ range (m + 1), (m.choose k : ℂ) *
           (if (n : ℤ) ∣ ((k : ℤ) - r) then (n : ℂ) * (if Even (((k : ℤ) - r) / (n : ℤ)) then 1 else -1) else 0) := by
         refine Finset.sum_congr rfl fun k _ => by
@@ -118,11 +143,18 @@ theorem theorem1_K (n : ℕ) (hn : 0 < n) {μ : ℂ} (hμ0 : μ ≠ 0) (hμn : �
           (if (n : ℤ) ∣ ((k : ℤ) - r) then (if Even (((k : ℤ) - r) / (n : ℤ)) then 1 else -1) else 0) * (m.choose k : ℤ)) := by
         rw [Finset.mul_sum]
         refine Finset.sum_congr rfl fun k _ => by split_ifs <;> push_cast <;> ring
+
     _ = (n : ℂ) * (∑ k ∈ range (m + 1),
           (if (n : ℤ) ∣ ((k : ℤ) - r) then (if Even (((k : ℤ) - r) / (n : ℤ)) then 1 else -1) else 0) * (m.choose k : ℤ)) :=
         rfl
 
-/-- **Formula (8)** with concrete root `ω = exp(2πi/n)`. -/
+---
+
+/-- **Formula (8)** with concrete root $\omega = e^{2\pi i/n}$.
+
+Instantiates theorem1_H with $\zeta = e^{2\pi i/n}$.
+-/
+
 theorem theorem1_H_exp (n : ℕ) (hn : 0 < n) (r : ℤ) (m : ℕ) :
     (∑ k ∈ range (m + 1), (if (n : ℤ) ∣ ((k : ℤ) - r) then (m.choose k : ℤ) else 0) : ℂ)
       = (n : ℂ)⁻¹ * ∑ j ∈ range n, (exp (2 * Real.pi * I / n) ^ j + 1) ^ m *
@@ -131,7 +163,13 @@ theorem theorem1_H_exp (n : ℕ) (hn : 0 < n) (r : ℤ) (m : ℕ) :
   rw [← theorem1_H n hn (Complex.isPrimitiveRoot_exp n hn.ne') r m, ← mul_assoc,
     inv_mul_cancel₀ hn0, one_mul]
 
-/-- **Formula (9)** with concrete root `μ = exp(πi/n)`. -/
+---
+
+/-- **Formula (9)** with concrete root $\mu = e^{\pi i/n}$.
+
+Instantiates theorem1_K with $\mu = e^{\pi i/n}$ (satisfying $\mu^n = -1$).
+-/
+
 theorem theorem1_K_exp (n : ℕ) (hn : 0 < n) (r : ℤ) (m : ℕ) :
     (∑ k ∈ range (m + 1),
       (if (n : ℤ) ∣ ((k : ℤ) - r) then (if Even (((k : ℤ) - r) / (n : ℤ)) then 1 else -1) else 0) * (m.choose k : ℤ) : ℂ)
