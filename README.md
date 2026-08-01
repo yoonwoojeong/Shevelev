@@ -66,63 +66,69 @@ $$=\ \sum_{\substack{k=0 \\ n \mid (k-r)}}^{m} \binom{m}{k} \cdot n
 
 ### Lean Correspondence
 
-The `calc` chain in `theorem1_H` mirrors each step above directly.
+The derivation above is carried out **once**, in the lemma `sum_geom_pow`, for the general
+geometric family $x_j = b\,q^j$ with $q$ a primitive $n$-th root of unity and $b \neq 0$:
 
-**Step 1 — Binomial expansion**
+$$\sum_{j=0}^{n-1}(x_j+1)^m x_j^{-r} \ =\ n \sum_{\substack{k=0 \\ n \mid (k-r)}}^{m} b^{\,k-r}\binom{m}{k}$$
 
-*Math:*
+Formula (8) is the case $(b,q) = (1,\omega)$, where $x_j = \omega^j$ and $b^{k-r} = 1$;
+Formula (9) is the case $(b,q) = (\mu,\mu^2)$, where $x_j = \mu^{2j+1}$.
 
-$$\sum_{j}\,(\zeta^j+1)^m \zeta^{-jr} = \sum_j \sum_k \tbinom{m}{k}\,\zeta^{j(k-r)}$$
+**Step 1 — Binomial expansion**, shifted by $-r$:
+$(x+1)^m x^{-r} = \sum_k x^{k-r}\binom{m}{k}$.
 
-*Lean:*
 ```lean
-∑ j ∈ range n, (ζ ^ j + 1) ^ m * ζ ^ (-((j : ℤ) * r))
-  = ∑ j ∈ range n, ∑ k ∈ range (m + 1), (m.choose k : ℂ) * ζ ^ ((j : ℤ) * ((k : ℤ) - r)) := by
-    rw [add_pow, Finset.sum_mul]
-    -- combine exponents: ζ^(jk) * ζ^(-jr) = ζ^(j(k-r))
-    rw [← zpow_add₀ hζ0]; congr 1; ring
+have hterm : ∀ x : ℂ, x ≠ 0 → (x + 1) ^ m * x ^ (-r)
+    = ∑ k ∈ range (m + 1), x ^ ((k : ℤ) - r) * (m.choose k : ℂ) := fun x hx => by
+  rw [add_pow, sum_mul]
+  exact sum_congr rfl fun k _ => by
+    rw [one_pow, mul_one, sub_eq_add_neg, zpow_add₀ hx, zpow_natCast]; ring
 ```
 
-**Step 2 — Swap summation order**
+**Step 2 — Separate the two factors** of $x_j^{k-r} = b^{k-r} q^{j(k-r)}$:
 
-*Math:*
-
-$$\sum_j \sum_k \tbinom{m}{k}\,\zeta^{j(k-r)} = \sum_k \tbinom{m}{k} \sum_j \zeta^{j(k-r)}$$
-
-*Lean:*
 ```lean
-  = ∑ k ∈ range (m + 1), ∑ j ∈ range n, (m.choose k : ℂ) * ζ ^ ((j : ℤ) * ((k : ℤ) - r))
-    := Finset.sum_comm
+calc ∑ j ∈ range n, (b * q ^ j + 1) ^ m * (b * q ^ j) ^ (-r)
+    = ∑ j ∈ range n, ∑ k ∈ range (m + 1),
+        b ^ ((k : ℤ) - r) * (m.choose k : ℂ) * q ^ ((j : ℤ) * ((k : ℤ) - r)) :=
+      sum_congr rfl fun j _ =>
+        (hterm _ (mul_ne_zero hb (pow_ne_zero j hq0))).trans <| sum_congr rfl fun k _ => by
+          rw [mul_zpow, ← zpow_natCast q j, ← zpow_mul]; ring
 ```
 
-**Step 3 — Root-of-unity filter**
+**Step 3 — Root-of-unity filter.** $\sum_{j<n} q^{ja}$ is $n$ when $n \mid a$ and $0$ otherwise;
+the second case is a geometric series with $q^a \neq 1$ and $(q^a)^n = 1$, hence numerator $0$:
 
-*Math:*
-
-$$\sum_k \tbinom{m}{k} \sum_j \zeta^{j(k-r)} = \sum_k \tbinom{m}{k} \cdot \begin{cases} n & n \mid (k-r) \\ 0 & \text{otherwise} \end{cases}$$
-
-*Lean:*
 ```lean
-  = ∑ k ∈ range (m + 1), (m.choose k : ℂ) * (if (n : ℤ) ∣ ((k : ℤ) - r) then (n : ℂ) else 0) := by
-    -- prove filter: ∑_j ζ^(ja) = n if n|a, else 0
-    have key : ∑ j ∈ range n, ζ ^ ((j : ℤ) * a) = if (n : ℤ) ∣ a then (n : ℂ) else 0 := by
-      by_cases h : (n : ℤ) ∣ a
-      · simp [(hζ.zpow_eq_one_iff_dvd a).mpr h]       -- n | a → ζ^a = 1, each term = 1
-      · have h1 : ζ ^ a ≠ 1 := fun hc => h ((hζ.zpow_eq_one_iff_dvd a).mp hc)
-        rw [geom_sum_eq h1, hζ.pow_eq_one, sub_self, zero_div]  -- geometric series → 0
-    rw [← Finset.mul_sum, key]
+have hfil : ∀ a : ℤ, ∑ j ∈ range n, q ^ ((j : ℤ) * a)
+    = if (n : ℤ) ∣ a then (n : ℂ) else 0 := by
+  intro a
+  have h : ∀ j : ℕ, q ^ ((j : ℤ) * a) = (q ^ a) ^ j := fun j => by
+    rw [mul_comm, zpow_mul, zpow_natCast]
+  simp only [h]
+  by_cases hd : (n : ℤ) ∣ a
+  · simp [hd, (hq.zpow_eq_one_iff_dvd a).mpr hd]
+  · rw [geom_sum_eq fun hc => hd ((hq.zpow_eq_one_iff_dvd a).mp hc),
+      show (q ^ a) ^ n = 1 by rw [← zpow_natCast (q ^ a) n, ← zpow_mul, mul_comm, zpow_mul,
+        zpow_natCast, hq.pow_eq_one, one_zpow], sub_self, zero_div, if_neg hd]
 ```
 
-**Step 4 — Factor out $n$**
+**Step 4 — Swap, filter, factor out $n$**, in a single `calc` step:
 
-*Math:*
-
-$$\sum_k \tbinom{m}{k} \cdot [n \mid (k-r)] \cdot n \ =\ n \cdot H(n,r,m)$$
-
-*Lean:*
 ```lean
-  = (n : ℂ) * (∑ k ∈ range (m + 1), (if (n : ℤ) ∣ ((k : ℤ) - r) then (m.choose k : ℤ) else 0))
-    := by rw [Finset.mul_sum]; split_ifs <;> ring
+  _ = n * ∑ k ∈ range (m + 1),
+        if (n : ℤ) ∣ (k : ℤ) - r then b ^ ((k : ℤ) - r) * (m.choose k : ℂ) else 0 := by
+      rw [sum_comm, mul_sum]
+      exact sum_congr rfl fun k _ => by rw [← mul_sum, hfil]; split_ifs <;> ring
+```
+
+Formula (8) then follows by instantiating at $b = 1$, which erases the weight $b^{k-r}$:
+
+```lean
+theorem theorem1_H (n : ℕ) (hn : 0 < n) {ω : ℂ} (hω : IsPrimitiveRoot ω n) (r : ℤ) (m : ℕ) :
+    ∑ j ∈ range n, (ω ^ j + 1) ^ m * (ω ^ j) ^ (-r)
+      = n * ∑ k ∈ range (m + 1), if (n : ℤ) ∣ (k : ℤ) - r then (m.choose k : ℂ) else 0 := by
+  simpa only [one_mul, one_zpow] using sum_geom_pow n hn one_ne_zero hω r m
 ```
 
 ---
@@ -141,45 +147,55 @@ $$n \cdot K(n, r, m) \ =\ \sum_{j=0}^{n-1} (\mu^{2j+1} + 1)^m \cdot \mu^{-(2j+1)
 
 ### Proof
 
-The derivation is parallel to Theorem 1 (same three steps: expand, swap, filter), with one difference in the filter step.
+No new derivation is needed.  Since $\mu^{2j+1} = \mu \cdot (\mu^2)^j$, the summands form the
+*same* geometric family $x_j = b\,q^j$ as in §2, now with $b = \mu$ and $q = \mu^2$ — and $\mu^2$
+is a primitive $n$-th root of unity by hypothesis.  The lemma therefore applies verbatim:
 
-**Modified filter.** Since $\mu^{2j+1} = \mu \cdot (\mu^2)^j$ and $\mu^2$ is a primitive $n$-th root,
+$$\sum_{j=0}^{n-1}\left(\mu^{2j+1}+1\right)^m \left(\mu^{2j+1}\right)^{-r}
+\ =\ n \sum_{\substack{k=0 \\ n \mid (k-r)}}^{m} \mu^{\,k-r}\binom{m}{k}$$
 
-$$\sum_{j=0}^{n-1} \mu^{(2j+1)a}
-\ =\ \mu^a \sum_{j=0}^{n-1} (\mu^2)^{ja}
-\ =\ \mu^a \cdot \begin{cases} n & n \mid a \\ 0 & \text{otherwise} \end{cases}$$
+It remains only to identify the weight $\mu^{k-r}$.  On the surviving terms $n \mid k-r$, so
+writing $k - r = nt$ with $t = (k-r)/n$, the hypothesis $\mu^n = -1$ gives
 
-When $n \mid a$, write $a = nt$. Then $\mu^a = (\mu^n)^t = (-1)^t$, so:
+$$\mu^{\,k-r} \ =\ \left(\mu^{n}\right)^{t} \ =\ (-1)^{t} \ =\ (-1)^{(k-r)/n},$$
 
-$$\sum_{j=0}^{n-1} \mu^{(2j+1)a}
-\ =\
-\begin{cases} n \cdot (-1)^{a/n} & n \mid a, \\ 0 & \text{otherwise.}\end{cases}$$
-
-Applying this with $a = k - r$ and collecting:
-
-$$\sum_{k=0}^{m} \binom{m}{k} \sum_j \mu^{(2j+1)(k-r)}
-\ =\ \sum_{\substack{k=0 \\ n \mid (k-r)}}^{m} (-1)^{(k-r)/n} \binom{m}{k} \cdot n
-\ =\ n \cdot K(n,r,m). \qquad \square$$
+which is exactly the sign appearing in $K_s(m,n)$. $\square$
 
 ---
 
 ### Lean Correspondence
 
-The key internal lemma `key_odd` in `theorem1_K` proves the modified filter:
+Rewrite the summand into the family shape, apply `sum_geom_pow`, convert the weight to a sign:
 
 ```lean
-have key_odd : ∑ j ∈ range n, μ ^ ((2 * (j : ℤ) + 1) * a)
-    = if (n : ℤ) ∣ a then (n : ℂ) * (if Even (a / (n : ℤ)) then 1 else -1) else 0 := by
-  -- factor μ^((2j+1)a) = μ^a · (μ²)^(ja)
-  have hsplit : μ ^ ((2 * ↑j + 1) * a) = μ ^ a * (μ ^ 2) ^ (↑j * a)
-  -- apply even-root filter to (μ²)^(ja), yielding n or 0
-  have key_even : ∑ j ∈ range n, (μ ^ 2) ^ (↑j * a) = if (n : ℤ) ∣ a then (n : ℂ) else 0
-  -- when n | a, write a = nt; then μ^a = (μ^n)^t = (-1)^t
-  obtain ⟨t, ht⟩ := h
-  have hμa : μ ^ a = (-1 : ℂ) ^ t := by rw [ht, zpow_mul, zpow_natCast, hμn]
+calc ∑ j ∈ range n, (μ ^ (2 * j + 1) + 1) ^ m * (μ ^ (2 * j + 1)) ^ (-r)
+    = ∑ j ∈ range n, (μ * (μ ^ 2) ^ j + 1) ^ m * (μ * (μ ^ 2) ^ j) ^ (-r) :=
+      sum_congr rfl fun j _ => by
+        rw [show μ * (μ ^ 2) ^ j = μ ^ (2 * j + 1) by rw [← pow_mul, pow_succ]; ring]
+  _ = n * ∑ k ∈ range (m + 1),
+        if (n : ℤ) ∣ (k : ℤ) - r then μ ^ ((k : ℤ) - r) * (m.choose k : ℂ) else 0 :=
+      sum_geom_pow n hn hμ0 hμ2 r m
+  _ = _ := by
+      congr 1
+      refine sum_congr rfl fun k _ => ?_
+      by_cases hd : (n : ℤ) ∣ (k : ℤ) - r
+      · rw [if_pos hd, if_pos hd, hpow _ hd]
+      · rw [if_neg hd, if_neg hd]
 ```
 
-Here `if Even (a / n) then 1 else -1` is exactly $(-1)^{a/n}$, branching on parity of the integer quotient.
+where `hpow` is the sign identity $\mu^a = (-1)^{a/n}$ for $n \mid a$:
+
+```lean
+have hpow : ∀ a : ℤ, (n : ℤ) ∣ a → μ ^ a = if Even (a / (n : ℤ)) then 1 else -1 := by
+  rintro a ⟨t, rfl⟩
+  rw [Int.mul_ediv_cancel_left _ hn0, zpow_mul, zpow_natCast, hμn]
+  rcases Int.even_or_odd t with h | h
+  · rw [if_pos h, h.neg_one_zpow]
+  · rw [if_neg (Int.not_even_iff_odd.2 h), h.neg_one_zpow]
+```
+
+`if Even (a / n) then 1 else -1` is exactly $(-1)^{a/n}$, branching on the parity of the
+integer quotient.
 
 ---
 
@@ -197,11 +213,17 @@ Both are immediate consequences of Theorems 1–2 by substituting the specified 
 
 ---
 
-## 5. Build
+## 5. Contents and Build
+
+`Shevelev.lean` (121 lines) holds exactly five declarations: the filter lemma
+`sum_geom_pow`, the two general formulas `theorem1_H` and `theorem1_K`, and their
+concrete instances `theorem1_H_exp`, `theorem1_K_exp` at $\omega = e^{2\pi i/n}$ and
+$\mu = e^{\pi i/n}$.  There are no auxiliary definitions: $H_s(m,n)$ and $K_s(m,n)$ appear
+directly as sums in the theorem statements.
 
 ```bash
 lake env lean Shevelev.lean   # fast typecheck
 lake build                    # full build
 ```
 
-Lean 4.30.0 / Mathlib v4.30.0. Compiles without errors or warnings.
+Lean 4.30.0 / Mathlib v4.30.0. Compiles with no errors, warnings, or `sorry`.
